@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@ice-king/shared": ["packages/shared/src/index.ts"],
+      "@ice-king/game-core": ["packages/game-core/src/index.ts"],
+      "@ice-king/config": ["packages/config/src/index.ts"],
+      "@ice-king/theme-default": ["packages/theme-default/src/index.ts"]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+.env
+.env.local
+apps/client/.env
+apps/client/.env.local
+
+node_modules
+apps/client/dist
+.npm-cache
+.vitest-cache
+/.playwright-cli
