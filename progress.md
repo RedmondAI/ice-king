@@ -593,3 +593,14 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
   - `npm run test` -> pass (`14/14`)
   - `npm run build` -> pass
   - `PORT=7777 npm start` -> ok; `/api/bot/decide` returns `OPENAI_API_KEY_MISSING` when not configured.
+
+## 2026-02-11 (Milestone Update 28)
+- Railway host-allowlist fix for Vite preview:
+  - configured `allowedHosts` for both `server` and `preview` in Vite config.
+  - defaults now include Railway app domains (`.up.railway.app`) plus localhost entries.
+  - added optional env override `ICEKING_ALLOWED_HOSTS` (comma-separated; use `*`/`true` to allow all).
+- Files updated:
+  - `apps/client/vite.config.ts`
+  - `progress.md`
+- Validation:
+  - `npm run build` -> pass

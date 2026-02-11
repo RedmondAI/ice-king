@@ -167,6 +167,21 @@ function parseModelFallbacks(raw: string | undefined): string[] {
     .filter((entry) => entry.length > 0);
 }
 
+function parseAllowedHosts(raw: string | undefined): string[] | true {
+  const normalized = raw?.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '*') {
+    return true;
+  }
+
+  const defaults = ['.up.railway.app', 'localhost', '127.0.0.1'];
+  const parsed = (raw ?? defaults.join(','))
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  return parsed.length > 0 ? parsed : defaults;
+}
+
 function extractUsage(result: ResponsesApiResult): BotUsageResponse {
   const rawInput = result.usage?.input_tokens ?? result.usage?.prompt_tokens ?? 0;
   const rawOutput = result.usage?.output_tokens ?? result.usage?.completion_tokens ?? 0;
@@ -567,6 +582,7 @@ export default defineConfig(({ mode }) => {
     ...loadEnv(mode, __dirname, ''),
     ...process.env,
   } as EnvMap;
+  const allowedHosts = parseAllowedHosts(env.ICEKING_ALLOWED_HOSTS);
 
   return {
     plugins: [openAiBotMiddleware(env)],
@@ -581,6 +597,11 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 5173,
+      allowedHosts,
+    },
+    preview: {
+      host: '0.0.0.0',
+      allowedHosts,
     },
   };
 });
