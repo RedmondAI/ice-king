@@ -763,17 +763,15 @@ export class GameRuntime {
     }
 
     if (tile.ownerId === this.playerId && tile.type === 'POND') {
-      const hasActivePondJob = state.ponds.some(
+      const pondJob = state.ponds.find(
         (entry) =>
-          entry.ownerId === this.playerId &&
-          entry.pondX === tile.x &&
-          entry.pondY === tile.y &&
-          entry.status === 'ACTIVE',
+          entry.ownerId === this.playerId && entry.pondX === tile.x && entry.pondY === tile.y,
       );
+
       if (state.season.logicSeason === 'WINTER') {
-        if (hasActivePondJob) {
+        if (pondJob?.status === 'ACTIVE') {
           actions.push({ id: 'pond-start', label: 'Harvest In Progress', disabled: true });
-        } else {
+        } else if (pondJob?.status === undefined) {
           actions.push({
             id: 'pond-start',
             label: `Start Harvest Job ($1c, ready in ${formatMmSs(this.engine.config.timing.pondHarvestDurationMs)})`,
