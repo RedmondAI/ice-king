@@ -47,7 +47,7 @@ If this file conflicts with code, update this file in the same change set.
 - Build factory: `2 ice + $2`.
 - Build man-made pond: `1 ice + $2`.
 - Start pond harvest: `$1` (summer starts yield half ice).
-- Sell at house:
+- Sell at house (Summer only):
 - Ice: `$2` each.
 - Blue ice: `$8` each.
 - Factory craft:

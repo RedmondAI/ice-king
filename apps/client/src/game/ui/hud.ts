@@ -10,6 +10,7 @@ export interface PopupMenu {
   text: string;
   screenX: number;
   screenY: number;
+  warningText?: string;
   actions: PopupAction[];
 }
 
@@ -239,7 +240,7 @@ export class HudLayer {
 
   setPondPopup(popup: PopupMenu | null): void {
     const signature = popup
-      ? `${popup.text}::${popup.screenX}::${popup.screenY}::${popup.actions
+      ? `${popup.text}::${popup.warningText ?? ''}::${popup.screenX}::${popup.screenY}::${popup.actions
           .map((action) => `${action.id}|${action.label}|${action.disabled ? '1' : '0'}`)
           .join(',')}`
       : '';
@@ -261,6 +262,14 @@ export class HudLayer {
 
     const text = document.createElement('div');
     text.textContent = popup.text;
+    node.append(text);
+
+    if (popup.warningText) {
+      const warning = document.createElement('div');
+      warning.className = 'popup-warning';
+      warning.textContent = popup.warningText;
+      node.append(warning);
+    }
 
     const buttons = document.createElement('div');
     buttons.className = 'popup-buttons';
@@ -274,7 +283,6 @@ export class HudLayer {
       buttons.append(button);
     }
 
-    node.append(text);
     if (buttons.children.length > 0) {
       node.append(buttons);
     }

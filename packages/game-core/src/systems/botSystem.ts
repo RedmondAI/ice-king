@@ -351,8 +351,14 @@ function scoreBotAction(
     case 'structure.factory.craftBlueIce':
       return 80 + (player.money < 8 ? 8 : 0) + (state.season.logicSeason === 'SUMMER' ? 6 : 0);
     case 'structure.house.sellIce':
+      if (state.season.logicSeason !== 'SUMMER') {
+        return 0;
+      }
       return 72 + Math.min(24, action.quantity * 4) + (msToFlip < 20000 ? 10 : 0);
     case 'structure.house.sellBlueIce':
+      if (state.season.logicSeason !== 'SUMMER') {
+        return 0;
+      }
       return 66 + Math.min(18, action.quantity * 5) + (player.money < 10 ? 10 : 0);
     case 'camera.move':
     case 'tile.select':
@@ -411,52 +417,10 @@ export function enumerateCandidateBotActions(
   }
 
   const houses = ownHouses(state, botPlayerId);
+  const canSellAtHouse = state.season.logicSeason === 'SUMMER';
   for (const house of houses.slice(0, 2)) {
-    if (player.ice > 0 && state.season.logicSeason === 'WINTER' && msToFlip < 20000) {
-      addAction(
-        actions,
-        seen,
-        {
-          type: 'structure.house.sellIce',
-          playerId: botPlayerId,
-          x: house.x,
-          y: house.y,
-          quantity: player.ice,
-        },
-        maxActions,
-      );
-    }
-
-    if (storage.unrefrigeratedIce > 0) {
-      addAction(
-        actions,
-        seen,
-        {
-          type: 'structure.house.sellIce',
-          playerId: botPlayerId,
-          x: house.x,
-          y: house.y,
-          quantity: storage.unrefrigeratedIce,
-        },
-        maxActions,
-      );
-    }
-
-    if (player.ice > 0) {
-      addAction(
-        actions,
-        seen,
-        {
-          type: 'structure.house.sellIce',
-          playerId: botPlayerId,
-          x: house.x,
-          y: house.y,
-          quantity: 1,
-        },
-        maxActions,
-      );
-
-      if (player.ice > 1) {
+    if (canSellAtHouse) {
+      if (storage.unrefrigeratedIce > 0) {
         addAction(
           actions,
           seen,
@@ -465,28 +429,43 @@ export function enumerateCandidateBotActions(
             playerId: botPlayerId,
             x: house.x,
             y: house.y,
-            quantity: player.ice,
+            quantity: storage.unrefrigeratedIce,
           },
           maxActions,
         );
       }
-    }
 
-    if (player.blueIce > 0) {
-      addAction(
-        actions,
-        seen,
-        {
-          type: 'structure.house.sellBlueIce',
-          playerId: botPlayerId,
-          x: house.x,
-          y: house.y,
-          quantity: 1,
-        },
-        maxActions,
-      );
+      if (player.ice > 0) {
+        addAction(
+          actions,
+          seen,
+          {
+            type: 'structure.house.sellIce',
+            playerId: botPlayerId,
+            x: house.x,
+            y: house.y,
+            quantity: 1,
+          },
+          maxActions,
+        );
 
-      if (player.blueIce > 1) {
+        if (player.ice > 1) {
+          addAction(
+            actions,
+            seen,
+            {
+              type: 'structure.house.sellIce',
+              playerId: botPlayerId,
+              x: house.x,
+              y: house.y,
+              quantity: player.ice,
+            },
+            maxActions,
+          );
+        }
+      }
+
+      if (player.blueIce > 0) {
         addAction(
           actions,
           seen,
@@ -495,10 +474,25 @@ export function enumerateCandidateBotActions(
             playerId: botPlayerId,
             x: house.x,
             y: house.y,
-            quantity: player.blueIce,
+            quantity: 1,
           },
           maxActions,
         );
+
+        if (player.blueIce > 1) {
+          addAction(
+            actions,
+            seen,
+            {
+              type: 'structure.house.sellBlueIce',
+              playerId: botPlayerId,
+              x: house.x,
+              y: house.y,
+              quantity: player.blueIce,
+            },
+            maxActions,
+          );
+        }
       }
     }
   }

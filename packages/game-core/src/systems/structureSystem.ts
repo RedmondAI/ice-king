@@ -3,12 +3,21 @@ import type { ActionResult, CraftKind, GameState } from '@ice-king/shared';
 import { addLog, createId, getTile, inBounds } from '../helpers';
 import { canBuildOnTile } from './economySystem';
 
+const SUMMER_HOUSE_SALE_MESSAGE = 'you have to waint until summer to sell the ice';
+
 function assertPlayer(state: GameState, playerId: string): ActionResult | null {
   if (!state.players[playerId]) {
     return { ok: false, code: 'INVALID_PLAYER', message: 'Player does not exist.' };
   }
   if (state.match.ended) {
     return { ok: false, code: 'MATCH_ENDED', message: 'Match has already ended.' };
+  }
+  return null;
+}
+
+function assertHouseSaleSeason(state: GameState): ActionResult | null {
+  if (state.season.logicSeason !== 'SUMMER') {
+    return { ok: false, code: 'WRONG_SEASON', message: SUMMER_HOUSE_SALE_MESSAGE };
   }
   return null;
 }
@@ -156,6 +165,11 @@ export function sellIceAtHouse(
     return ownedTypeCheck;
   }
 
+  const seasonCheck = assertHouseSaleSeason(state);
+  if (seasonCheck) {
+    return seasonCheck;
+  }
+
   const player = state.players[playerId] as NonNullable<GameState['players'][string]>;
 
   if (quantity <= 0 || !Number.isInteger(quantity)) {
@@ -199,6 +213,11 @@ export function sellBlueIceAtHouse(
   const ownedTypeCheck = assertOwnedTileType(state, playerId, x, y, 'HOUSE');
   if (ownedTypeCheck) {
     return ownedTypeCheck;
+  }
+
+  const seasonCheck = assertHouseSaleSeason(state);
+  if (seasonCheck) {
+    return seasonCheck;
   }
 
   const player = state.players[playerId] as NonNullable<GameState['players'][string]>;

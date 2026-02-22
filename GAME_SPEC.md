@@ -23,7 +23,7 @@ Last updated: 2026-02-10
 - Build factory: `2 ice + $2`.
 - Build man-made pond: `1 ice + $2`.
 - Pond harvest start: `$1` (summer start yields half ice).
-- House sell:
+- House sell (Summer only):
 - Ice: `$2` each.
 - Blue ice: `$8` each.
 - Factory craft:

@@ -2,6 +2,14 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-22
+- Added summer-only house sale gating:
+  - `packages/game-core/src/systems/structureSystem.ts`: `sellIceAtHouse` and `sellBlueIceAtHouse` now fail with `WRONG_SEASON` outside `SUMMER`.
+  - `apps/client/src/game/runtime.ts`: house sale actions are disabled in winter and surface popup warning text.
+  - `apps/client/src/game/ui/hud.ts`: popup menu supports `warningText`.
+  - `apps/client/src/styles.css`: added red popup warning style.
+  - `packages/game-core/src/systems/botSystem.ts`: house sale bot candidates/actions are summer-gated.
+
 ## 2026-02-08
 - Initialized implementation session.
 - Loaded and reviewed:

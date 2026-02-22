@@ -428,6 +428,10 @@ input {
   gap: 6px;
 }
 
+.popup-warning {
+  color: #be1f1f;
+}
+
 .popup-buttons {
   display: flex;
   gap: 6px;

@@ -727,6 +727,8 @@ export class GameRuntime {
     const popupPoint = this.canvasToOverlayPoint(tileCenter.x + TILE_SIZE / 2, tileCenter.y + 8);
 
     const actions: Array<{ id: string; label: string; disabled?: boolean }> = [];
+    const isSummer = state.season.logicSeason === 'SUMMER';
+    let warningText: string | undefined;
 
     const hasPendingPondJob = tile.type === 'POND' && state.ponds.some(
       (entry) =>
@@ -788,9 +790,12 @@ export class GameRuntime {
     }
 
     if (tile.ownerId === this.playerId && tile.type === 'HOUSE') {
-      actions.push({ id: 'sell-ice-1', label: 'Sell 1 Ice ($2c)' });
-      actions.push({ id: 'sell-ice-all', label: 'Sell All Ice' });
-      actions.push({ id: 'sell-blue-1', label: 'Sell 1 Blue Ice ($8c)' });
+      if (!isSummer) {
+        warningText = 'you have to waint until summer to sell the ice';
+      }
+      actions.push({ id: 'sell-ice-1', label: 'Sell 1 Ice ($2c)', disabled: !isSummer });
+      actions.push({ id: 'sell-ice-all', label: 'Sell All Ice', disabled: !isSummer });
+      actions.push({ id: 'sell-blue-1', label: 'Sell 1 Blue Ice ($8c)', disabled: !isSummer });
     }
 
     if (tile.ownerId === this.playerId && tile.type === 'FACTORY') {
@@ -807,6 +812,7 @@ export class GameRuntime {
         text: `Tile ${tile.x},${tile.y} | ${tile.type} | ${tile.ownerId ?? 'UNOWNED'}\nNo actions available for this tile.`,
         screenX: popupPoint.x,
         screenY: popupPoint.y,
+        warningText,
         actions: [],
       });
       return;
@@ -816,6 +822,7 @@ export class GameRuntime {
       text: `Tile ${tile.x},${tile.y} | ${tile.type} | ${tile.ownerId ?? 'UNOWNED'}`,
       screenX: popupPoint.x,
       screenY: popupPoint.y,
+      warningText,
       actions,
     });
   }
