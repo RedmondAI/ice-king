@@ -383,46 +383,25 @@ input {
   background: rgba(20, 50, 40, 0.15);
 }
 
-.action-panel {
-  position: absolute;
-  right: 14px;
-  bottom: 266px;
-  width: min(360px, 42vw);
-  padding: 10px;
-  display: grid;
-  gap: 8px;
-  font-size: 10px;
-  z-index: 105;
-}
-
-.action-panel.hidden {
-  display: none;
-}
-
-.action-panel h3 {
-  margin: 0;
-  font-size: 11px;
-}
-
-.action-buttons {
-  display: grid;
-  gap: 6px;
-}
-
-.action-buttons .pixel-button {
-  font-size: 9px;
-  min-height: 34px;
-}
-
 .debug-overlay {
   position: absolute;
   left: 14px;
-  bottom: 14px;
+  bottom: 50px;
   width: min(420px, 50vw);
   padding: 10px;
   font-size: 9px;
   line-height: 1.4;
   white-space: pre-wrap;
+}
+
+.debug-toggle {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  min-width: 112px;
+  padding: 7px 8px;
+  font-size: 9px;
+  z-index: 90;
 }
 
 .popup {
@@ -469,7 +448,7 @@ input {
 .season-bar {
   position: absolute;
   left: 50%;
-  top: 14px;
+  bottom: 14px;
   transform: translateX(-50%);
   min-width: 300px;
   padding: 8px;
@@ -494,14 +473,6 @@ input {
   }
 
   .hud,
-  .action-panel {
-    width: min(320px, 52vw);
-  }
-
-  .action-panel {
-    bottom: 220px;
-  }
-
   .game-logo-badge {
     width: min(210px, 35vw);
   }
@@ -553,16 +524,11 @@ input {
     top: 10px;
   }
 
-  .action-panel {
-    right: 10px;
-    bottom: 206px;
-    width: min(360px, 94vw);
-  }
-
   .season-bar {
     min-width: 0;
     width: calc(100% - 20px);
-    left: 10px;
-    transform: none;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 10px;
   }
 }

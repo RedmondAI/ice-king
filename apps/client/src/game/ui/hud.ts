@@ -1,17 +1,12 @@
 import type { GameState } from '@ice-king/shared';
 
-export interface TileActionOption {
+export interface PopupAction {
   id: string;
   label: string;
   disabled?: boolean;
 }
 
-export interface PopupAction {
-  id: string;
-  label: string;
-}
-
-export interface PondPopup {
+export interface PopupMenu {
   text: string;
   screenX: number;
   screenY: number;
@@ -32,10 +27,8 @@ export class HudLayer {
   private readonly instructionsToggle: HTMLButtonElement;
   private readonly hudBody: HTMLDivElement;
   private readonly hudToggle: HTMLButtonElement;
-  private readonly actionPanel: HTMLDivElement;
-  private readonly actionButtons: HTMLDivElement;
-  private readonly actionInfo: HTMLDivElement;
   private readonly debugOverlay: HTMLDivElement;
+  private readonly debugToggleButton: HTMLButtonElement;
   private readonly seasonBar: HTMLDivElement;
   private readonly toastStack: HTMLDivElement;
   private readonly popupHost: HTMLDivElement;
@@ -45,11 +38,10 @@ export class HudLayer {
   private instructionsCollapsed = true;
   private debugEnabled = false;
   private toasts: ToastItem[] = [];
-  private lastActionPanelSignature: string | null = null;
+  private lastPopupSignature: string | null = null;
 
   constructor(
     mount: HTMLElement,
-    onActionClick: (actionId: string) => void,
     onPopupActionClick: (actionId: string) => void,
   ) {
     this.overlay = document.createElement('div');
@@ -154,27 +146,13 @@ export class HudLayer {
     this.instructions.append(instructionsHead, this.instructionsBody);
     this.hud.append(this.instructions, hudHead, this.hudBody);
 
-    this.actionPanel = document.createElement('div');
-    this.actionPanel.className = 'action-panel pixel-panel';
-
-    const actionTitle = document.createElement('h3');
-    actionTitle.textContent = 'Tile Actions';
-    this.actionInfo = document.createElement('div');
-    this.actionInfo.textContent = 'Select a tile.';
-
-    this.actionButtons = document.createElement('div');
-    this.actionButtons.className = 'action-buttons';
-
-    const debugButton = document.createElement('button');
-    debugButton.className = 'pixel-button';
-    debugButton.style.fontSize = '9px';
-    debugButton.textContent = 'Toggle Debug (F3)';
-    debugButton.addEventListener('click', () => {
+    this.debugToggleButton = document.createElement('button');
+    this.debugToggleButton.className = 'pixel-button debug-toggle';
+    this.debugToggleButton.textContent = 'Toggle debug';
+    this.debugToggleButton.addEventListener('click', () => {
       this.debugEnabled = !this.debugEnabled;
       this.debugOverlay.style.display = this.debugEnabled ? 'block' : 'none';
     });
-
-    this.actionPanel.append(actionTitle, this.actionInfo, this.actionButtons, debugButton);
 
     this.debugOverlay = document.createElement('div');
     this.debugOverlay.className = 'debug-overlay pixel-panel';
@@ -194,7 +172,7 @@ export class HudLayer {
 
     this.overlay.append(
       this.hud,
-      this.actionPanel,
+      this.debugToggleButton,
       this.debugOverlay,
       this.seasonBar,
       this.toastStack,
@@ -202,19 +180,6 @@ export class HudLayer {
     );
 
     mount.append(this.overlay);
-
-    this.actionButtons.addEventListener('click', (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) {
-        return;
-      }
-      const actionButton = target.closest<HTMLElement>('[data-action-id]');
-      const actionId = actionButton?.getAttribute('data-action-id');
-      if (!actionId) {
-        return;
-      }
-      onActionClick(actionId);
-    });
 
     this.popupHost.addEventListener('click', (event) => {
       const target = event.target;
@@ -266,41 +231,50 @@ export class HudLayer {
     )}%`;
   }
 
-  setActionPanel(title: string, actions: TileActionOption[]): void {
-    const signature = title
-      ? `${title}::${actions.map((action) => `${action.id}|${action.label}|${action.disabled ? '1' : '0'}`).join(',')}`
+  setPondPopup(popup: PopupMenu | null): void {
+    const signature = popup
+      ? `${popup.text}::${popup.screenX}::${popup.screenY}::${popup.actions
+          .map((action) => `${action.id}|${action.label}|${action.disabled ? '1' : '0'}`)
+          .join(',')}`
       : '';
-    if (signature === this.lastActionPanelSignature) {
+    if (signature === this.lastPopupSignature) {
       return;
     }
-    this.lastActionPanelSignature = signature;
+    this.lastPopupSignature = signature;
 
-    if (!title) {
-      this.actionPanel.classList.add('hidden');
-      this.actionInfo.textContent = 'Select a tile.';
-      this.actionButtons.innerHTML = '';
-      return;
-    }
-
-    this.actionPanel.classList.remove('hidden');
-    this.actionInfo.textContent = title;
-    this.actionButtons.innerHTML = '';
-
-    if (actions.length === 0) {
-      const noActions = document.createElement('div');
-      noActions.textContent = 'No actions available for this tile.';
-      this.actionButtons.append(noActions);
+    if (!popup) {
+      this.popupHost.innerHTML = '';
       return;
     }
 
-    for (const action of actions) {
+    const node = document.createElement('div');
+    node.className = 'popup pixel-panel';
+    node.style.left = `${popup.screenX}px`;
+    node.style.top = `${popup.screenY}px`;
+    node.style.pointerEvents = 'auto';
+
+    const text = document.createElement('div');
+    text.textContent = popup.text;
+
+    const buttons = document.createElement('div');
+    buttons.className = 'popup-buttons';
+
+    for (const action of popup.actions) {
       const button = document.createElement('button');
       button.className = 'pixel-button';
       button.textContent = action.label;
       button.disabled = Boolean(action.disabled);
-      button.setAttribute('data-action-id', action.id);
-      this.actionButtons.append(button);
+      button.setAttribute('data-popup-action-id', action.id);
+      buttons.append(button);
     }
+
+    node.append(text);
+    if (buttons.children.length > 0) {
+      node.append(buttons);
+    }
+
+    this.popupHost.innerHTML = '';
+    this.popupHost.append(node);
   }
 
   setDebugText(text: string): void {
@@ -330,36 +304,6 @@ export class HudLayer {
       node.textContent = toast.text;
       this.toastStack.append(node);
     }
-  }
-
-  setPondPopup(popup: PondPopup | null): void {
-    this.popupHost.innerHTML = '';
-    if (!popup) {
-      return;
-    }
-
-    const node = document.createElement('div');
-    node.className = 'popup pixel-panel';
-    node.style.left = `${popup.screenX}px`;
-    node.style.top = `${popup.screenY}px`;
-    node.style.pointerEvents = 'auto';
-
-    const text = document.createElement('div');
-    text.textContent = popup.text;
-
-    const buttons = document.createElement('div');
-    buttons.className = 'popup-buttons';
-
-    for (const action of popup.actions) {
-      const button = document.createElement('button');
-      button.className = 'pixel-button';
-      button.textContent = action.label;
-      button.setAttribute('data-popup-action-id', action.id);
-      buttons.append(button);
-    }
-
-    node.append(text, buttons);
-    this.popupHost.append(node);
   }
 
   destroy(): void {

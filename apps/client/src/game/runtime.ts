@@ -108,7 +108,6 @@ export class GameRuntime {
   private hoveredTile: { x: number; y: number } | null = null;
   private selectedTile: { x: number; y: number } | null = null;
   private actionPanelTile: { x: number; y: number } | null = null;
-  private pendingPondPopup: { x: number; y: number } | null = null;
   private cameraDrag: CameraDragState | null = null;
   private ignoreNextClick = false;
   private debugOverlay = false;
@@ -160,7 +159,7 @@ export class GameRuntime {
     logoBadge.src = iceKingLogoUrl;
     logoBadge.alt = 'Ice King logo';
 
-    this.hud = new HudLayer(this.gameLayer, this.handleActionButton, this.handlePopupAction);
+    this.hud = new HudLayer(this.gameLayer, this.handlePopupAction);
 
     this.minimap = new MinimapController(this.minimapCanvas, (x, y) => {
       this.dispatchAction({
@@ -420,7 +419,6 @@ export class GameRuntime {
     if (!clickedTile || clickedTile.type === 'VOID') {
       this.selectedTile = null;
       this.actionPanelTile = null;
-      this.pendingPondPopup = null;
       this.hud.setPondPopup(null);
       this.updateActionPanel();
       return;
@@ -437,45 +435,12 @@ export class GameRuntime {
 
     if (!wasSameTile) {
       this.actionPanelTile = null;
-      this.pendingPondPopup = null;
       this.hud.setPondPopup(null);
       this.updateActionPanel();
       return;
     }
 
     this.actionPanelTile = tileCoord;
-
-    const tile = clickedTile;
-    const hasPendingPondJob = state.ponds.some(
-      (entry) =>
-        entry.ownerId === this.playerId &&
-        entry.pondX === tileCoord.x &&
-        entry.pondY === tileCoord.y &&
-        entry.status !== 'CLAIMED',
-    );
-    if (
-      tile &&
-      tile.type === 'POND' &&
-      tile.ownerId === this.playerId &&
-      state.season.logicSeason === 'WINTER' &&
-      !hasPendingPondJob
-    ) {
-      const screen = tileToScreen(state, this.playerId, tileCoord.x, tileCoord.y);
-      const overlayPoint = this.canvasToOverlayPoint(screen.x + TILE_SIZE / 2, screen.y + 8);
-      this.pendingPondPopup = tileCoord;
-      this.hud.setPondPopup({
-        text: `Spend $1c to start a ${formatMmSs(this.engine.config.timing.pondHarvestDurationMs)} harvest job?`,
-        screenX: overlayPoint.x,
-        screenY: overlayPoint.y,
-        actions: [
-          { id: 'pond-confirm', label: 'Yes' },
-          { id: 'pond-cancel', label: 'No' },
-        ],
-      });
-    } else {
-      this.pendingPondPopup = null;
-      this.hud.setPondPopup(null);
-    }
 
     this.updateActionPanel();
   };
@@ -542,7 +507,7 @@ export class GameRuntime {
   }
 
   private handleActionButton = (actionId: string): void => {
-    const tile = this.actionPanelTile ?? this.selectedTile;
+    const tile = this.actionPanelTile;
     if (!tile) {
       return;
     }
@@ -570,30 +535,38 @@ export class GameRuntime {
   private handlePopupAction = (actionId: string): void => {
     if (actionId === 'pond-cancel') {
       this.hud.setPondPopup(null);
-      this.pendingPondPopup = null;
+      this.actionPanelTile = null;
       return;
     }
 
-    if (actionId === 'pond-confirm' && this.pendingPondPopup) {
+    if (actionId === 'pond-confirm' && this.actionPanelTile) {
       const result = this.dispatchAction({
         type: 'pond.harvest.start',
         playerId: this.playerId,
-        x: this.pendingPondPopup.x,
-        y: this.pendingPondPopup.y,
+        x: this.actionPanelTile.x,
+        y: this.actionPanelTile.y,
       });
 
       if (result.ok) {
         const point = this.tileCenterToOverlayPoint(
-          this.pendingPondPopup.x,
-          this.pendingPondPopup.y,
+          this.actionPanelTile.x,
+          this.actionPanelTile.y,
         );
         this.spawnFlyingIce(point.x, point.y);
       }
 
       this.hud.setPondPopup(null);
-      this.pendingPondPopup = null;
       this.updateActionPanel();
+      return;
     }
+
+    if (this.actionPanelTile) {
+      this.handleActionButton(actionId);
+      return;
+    }
+
+    this.hud.showToast('Action unavailable.');
+    return;
   };
 
   private enumerateBotActions(state: GameState, botPlayerId: string): GameAction[] {
@@ -734,18 +707,47 @@ export class GameRuntime {
   private updateActionPanel(): void {
     const state = this.engine.getState();
     if (!this.actionPanelTile) {
-      this.hud.setActionPanel('', []);
+      this.hud.setPondPopup(null);
       return;
     }
 
     const tile = tileAt(state, this.actionPanelTile.x, this.actionPanelTile.y);
     if (!tile || tile.type === 'VOID') {
       this.actionPanelTile = null;
-      this.hud.setActionPanel('', []);
+      this.hud.setPondPopup(null);
       return;
     }
 
+    const tileCenter = tileToScreen(state, this.playerId, tile.x, tile.y);
+    const popupPoint = this.canvasToOverlayPoint(tileCenter.x + TILE_SIZE / 2, tileCenter.y + 8);
+
     const actions: Array<{ id: string; label: string; disabled?: boolean }> = [];
+
+    const hasPendingPondJob = tile.type === 'POND' && state.ponds.some(
+      (entry) =>
+        entry.ownerId === this.playerId &&
+        entry.pondX === tile.x &&
+        entry.pondY === tile.y &&
+        entry.status !== 'CLAIMED',
+    );
+
+    if (
+      tile.ownerId === this.playerId &&
+      tile.type === 'POND' &&
+      state.season.logicSeason === 'WINTER' &&
+      !hasPendingPondJob
+    ) {
+      this.hud.setPondPopup({
+        text: `Spend $1c to start a ${formatMmSs(this.engine.config.timing.pondHarvestDurationMs)} harvest job?`,
+        screenX: popupPoint.x,
+        screenY: popupPoint.y,
+        actions: [
+          { id: 'pond-confirm', label: 'Yes' },
+          { id: 'pond-cancel', label: 'No' },
+        ],
+      });
+      return;
+    }
 
     if (tile.ownerId === null) {
       actions.push({ id: 'tile-buy', label: 'Buy Tile ($1c)' });
@@ -805,9 +807,22 @@ export class GameRuntime {
       actions.push({ id: 'train-sale', label: 'Sell Annual Shipment (3 ice -> $9c)' });
     }
 
-    const title = `Tile ${tile.x},${tile.y} | ${tile.type} | ${tile.ownerId ?? 'UNOWNED'}`;
-    this.hud.setActionPanel(title, actions);
+    if (actions.length === 0) {
+      this.hud.setPondPopup({
+        text: `Tile ${tile.x},${tile.y} | ${tile.type} | ${tile.ownerId ?? 'UNOWNED'}\nNo actions available for this tile.`,
+        screenX: popupPoint.x,
+        screenY: popupPoint.y,
+        actions: [],
+      });
+      return;
+    }
 
+    this.hud.setPondPopup({
+      text: `Tile ${tile.x},${tile.y} | ${tile.type} | ${tile.ownerId ?? 'UNOWNED'}`,
+      screenX: popupPoint.x,
+      screenY: popupPoint.y,
+      actions,
+    });
   }
 
   private clientToCanvasPoint(clientX: number, clientY: number): { x: number; y: number } | null {

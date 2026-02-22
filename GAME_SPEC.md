@@ -82,7 +82,7 @@ Last updated: 2026-02-10
 - Camera pan: `WASD`, arrow keys, minimap drag, or map drag.
 - Tile interaction:
 - First click selects tile.
-- Second click on same tile opens tile action panel.
+- Second click on same tile opens tile action menu.
 - Fullscreen toggle: `F`.
 - Exit fullscreen: `Esc`.
 - Toggle debug panel: `F3`.
@@ -98,9 +98,9 @@ Last updated: 2026-02-10
 - Stats panel:
 - Top-right, collapsible, above map layer.
 - Shows money, ice, blue ice, refrigerators, refrigerated split, season, and train window status.
-- Tile action panel:
+- Tile action menu:
 - Hidden by default.
-- Appears in lower-right after the second click on the same tile (two-step selection).
+- Appears as a small popup above the selected tile after the second click on the same tile (two-step selection).
 - Ownership + hover visuals:
 - Blue/red outlines for owned tiles.
 - Yellow hover outline on unowned tiles.

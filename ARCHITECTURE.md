@@ -65,8 +65,8 @@ Last updated: 2026-02-10
 - DOM overlay layer sits above canvas and contains:
 - Instructions panel (top-right, above Stats; collapsed by default).
 - Stats HUD (top-right, collapsible).
-- Tile action panel (lower-right, hidden until second click on same tile).
-- Season bar, toasts, debug overlay, pond popup host.
+- Tile action popup host (small action menu anchored above clicked tiles, shown on second click).
+- Season bar, toasts, debug overlay.
 - Tile job overlay panel (progress frame + label + remaining time + chunked progress fill) for active pond/factory jobs.
 - Debug overlay includes cumulative bot token counters for API-cost tracking.
 - Layer ordering keeps HUD/panels above map visuals.

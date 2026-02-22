@@ -21,9 +21,9 @@ If this file conflicts with code, update this file in the same change set.
 6. Tile interactions:
 - Drag on main map pans camera.
 - Single click selects tile only.
-- Second click on the same tile opens tile action panel.
+- Second click on the same tile opens tile action menu.
 - Drag release suppresses accidental click-open.
-7. Tile action panel is anchored lower-right and hidden until the second click on the same tile.
+7. Tile action menu appears as a popup anchored above the selected tile and is shown on the second click.
 8. Stats panel is top-right, collapsible, and layered above map/overlays.
 8.1 Instructions panel is above Stats, collapsed by default, and explains core rules.
 9. Splash screen appears at root (`/`) every visit and includes first menu actions.

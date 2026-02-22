@@ -592,7 +592,20 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 - Validation:
   - `npm run test` -> pass (`14/14`)
   - `npm run build` -> pass
-  - `PORT=7777 npm start` -> ok; `/api/bot/decide` returns `OPENAI_API_KEY_MISSING` when not configured.
+- `PORT=7777 npm start` -> ok; `/api/bot/decide` returns `OPENAI_API_KEY_MISSING` when not configured.
+
+## 2026-02-22 (Milestone Update 29)
+- Moved all tile action UI from the fixed lower-right action panel into the existing popup overlay anchored above the selected tile.
+- Reworked pond/harvest prompt to use the same tile popup flow so no separate tile-action panel remains.
+- Added a bottom-left `Toggle Debug` on-canvas control (keyboard `F3` continues to work).
+- Files updated:
+  - `apps/client/src/game/ui/hud.ts`
+  - `apps/client/src/game/runtime.ts`
+  - `apps/client/src/styles.css`
+  - `GAME_SPEC.md`
+  - `ARCHITECTURE.md`
+  - `iceking.md`
+- No tests/builds executed for this UI-only edit (requested).
 
 ## 2026-02-11 (Milestone Update 28)
 - Railway host-allowlist fix for Vite preview:
