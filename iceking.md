@@ -1,13 +1,18 @@
 # Ice King Master Spec (Current Branch)
 
-Last updated: 2026-02-10
+Last updated: 2026-02-22
 
 This document is the implementation-aligned spec for the current client-first branch.
 If this file conflicts with code, update this file in the same change set.
 
 ## Current Build Scope
 - Primary playable mode is `Play vs Computer`.
-- `Create Game` and `Join Game` exist in UI but are placeholder flows.
+- `Create Game` and `Join Game` use the `/api/multiplayer/*` room flow via authoritative in-process room middleware.
+- Multiplayer authority is currently in-memory in the Vite host process (no persistent dedicated server yet).
+- Reconnect and room-expiry UX are now implemented:
+  - Player sessions are token-bound (`P1`/`P2` with persistent room tokens).
+  - Active matches pause when a player disconnects and resume messaging is shown while waiting for reconnect.
+  - Idle rooms eventually return `ROOM_EXPIRED` with actionable detail text.
 - Gameplay runs in a local deterministic engine (`packages/game-core`) inside the client runtime.
 - LLM bot decisions are supported through Vite middleware (`/api/bot/decide`) with heuristic fallback.
 
@@ -117,11 +122,12 @@ If this file conflicts with code, update this file in the same change set.
 ## Near-Term Roadmap
 1. Continue deepening play-vs-computer mechanics and balancing.
 2. Expand content variation and transition art coverage.
-3. Build true 2-player authoritative networking (`Create/Join` real backend).
-4. Add reconnect/session handling once server multiplayer exists.
+3. Move multiplayer room authority from Vite in-memory middleware to a dedicated backend service.
+4. Add cross-instance persistence and multi-instance room synchronization.
 
 ## Validation Baseline
 - `npm run test`
 - `npm run build`
 - Playwright flow: splash -> lobby -> match -> camera/action interactions -> no console errors
 - Keep `window.render_game_to_text()` and `window.advanceTime(ms)` operational.
+- `npm run test` now includes multiplayer API regression (`create -> join -> ready -> start -> action -> reconnect -> expiry`).

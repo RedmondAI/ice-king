@@ -1,4 +1,5 @@
 import type { ActionResult, GameAction, GameState, TileState } from '@ice-king/shared';
+import type { MultiplayerSession } from '../multiplayer/client';
 
 export interface RuntimeOutcome {
   winnerName: string | null;
@@ -11,6 +12,8 @@ export interface RuntimeInit {
   roomCode: string;
   opponentType: 'HUMAN' | 'BOT';
   configMode: 'PROD' | 'DEV_FAST';
+  multiplayerSession?: MultiplayerSession;
+  initialState?: GameState | null;
   onExit: (outcome: RuntimeOutcome) => void;
 }
 

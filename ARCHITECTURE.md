@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-Last updated: 2026-02-10
+Last updated: 2026-02-22
 
 ## Architecture Style
 - Current architecture is modular state + systems (not ECS).
@@ -14,6 +14,7 @@ Last updated: 2026-02-10
 - Runtime orchestration (`GameRuntime`).
 - Canvas renderer + HUD + minimap + bot policy clients.
 - Local dev middleware (`/api/bot/decide`) in `vite.config.ts`.
+- Multiplayer transport helpers in `src/multiplayer/client.ts` plus menu/lobby runtime wiring in `src/app/bootstrap.ts`.
 - `packages/game-core`
 - Deterministic game engine + systems.
 - Map generation, economy, season, structures, pond lifecycle, win logic, bot logic.
@@ -27,11 +28,14 @@ Last updated: 2026-02-10
 ## Runtime Flow
 1. `bootstrapApp` renders splash on root every visit.
 2. Splash acts as first menu surface (name + Create/Join/Play vs Computer/How to Play/Settings).
-3. Lobby is rendered; `Play vs Computer` starts runtime when human toggles ready.
-4. `GameRuntime` creates `GameEngine.createPlayVsComputer(...)`.
+3. Lobby is rendered for either `Play vs Computer` or `Create/Join` multiplayer room flow.
+4. `GameRuntime` runs either:
+- local play-vs-computer engine, or
+- multiplayer-synced state via `/api/multiplayer/*` room endpoints.
+  - lobby polls `/api/multiplayer/state`, ready/start uses `ready` and `start`, and game actions post to `/api/multiplayer/action`.
 5. Frame loop:
 - Input handling (keys, map drag, minimap drag, two-step click tile behavior).
-- Fixed-step engine tick.
+- Fixed-step engine tick (local mode) or remote state sync poll (multiplayer mode).
 - External bot director update (when enabled).
 - HUD/action panel updates.
 - Main canvas + minimap render.
@@ -41,6 +45,7 @@ Last updated: 2026-02-10
 - All user/bot gameplay actions pass through `GameActionSchema`.
 - Engine owns mutation; UI/runtime never mutates core state directly.
 - Runtime map includes a non-interactable `VOID` border ring around playable content; engine validation blocks selection/purchase/action use on `VOID`.
+- Multiplayer session integrity is enforced by room token + room code checks and reconnect-aware heartbeats.
 
 ## Systems in `packages/game-core`
 - `seasonSystem`
@@ -96,9 +101,15 @@ Last updated: 2026-02-10
 - A post-action cooldown enforces `20-30` seconds between accepted bot actions.
 
 ## Networking Status
-- Dedicated multiplayer server is not implemented yet.
-- Current simulation is local client-first with deterministic engine.
-- `Create Game` / `Join Game` are staged UI for future multiplayer backend.
+- Multiplayer room API is now implemented in `apps/client/vite.config.ts` as an in-memory authoritative service.
+- Endpoints: `create`, `join`, `ready`, `start`, `state`, `action` under `/api/multiplayer/*`.
+- Current limitations:
+- room state is process-memory only (no persistence, no cross-instance coordination).
+- no dedicated `apps/server` deployment target yet.
+- room lifecycle now includes disconnect gating and expiry:
+  - disconnected players can reconnect during a configured pause window (`ICEKING_MULTIPLAYER_RECONNECT_PAUSE_MS`)
+  - exceeded pause windows forfeit the disconnected player during active matches
+  - idle rooms return `ROOM_EXPIRED` with human-readable detail text
 
 ## Configuration and Environment
 - Static defaults in `packages/config/src/index.ts`.
@@ -113,6 +124,10 @@ Last updated: 2026-02-10
 - `ICEKING_BOT_MAX_OUTPUT_TOKENS`
 - `VITE_ENABLE_LLM_BOT`
 - `VITE_DISABLE_LLM_BOT`
+- `ICEKING_MULTIPLAYER_ROOM_TTL_MS` (room inactivity expiry in ms, default 6h)
+- `ICEKING_MULTIPLAYER_RECONNECT_PAUSE_MS` (disconnect grace window in ms, default 90s)
+- `ICEKING_MULTIPLAYER_MAX_ROOMS` (soft per-process room cap)
+- `ICEKING_MULTIPLAYER_MAX_BODY_BYTES` (API body cap)
 
 ## Testing and Validation
 - Baseline checks:
@@ -123,6 +138,7 @@ Last updated: 2026-02-10
 - drag pan + two-click tile actions
 - no console errors
 - debug hooks (`render_game_to_text`, `advanceTime`) remain working
+- Multiplayer regression: `npm run test:multiplayer` (create/join/ready/start/actions/reconnect/expiry)
 
 ## Extension Rules
 - Add new mechanics as isolated system/module changes in `packages/game-core`.

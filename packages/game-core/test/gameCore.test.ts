@@ -312,6 +312,10 @@ describe('season and pond systems', () => {
     expect(claimResult.ok).toBe(true);
     expect(state.players.P1.ice).toBe(1);
 
+    state.season.logicSeason = 'SUMMER';
+    state.season.visualFromSeason = 'SUMMER';
+    state.season.visualToSeason = 'WINTER';
+
     const sellResult = engine.applyAction({
       type: 'structure.house.sellIce',
       playerId: 'P1',
@@ -420,7 +424,9 @@ describe('bot behavior constraints', () => {
     factory.ownerId = 'P2';
     factory.type = 'FACTORY';
 
-    state.season.logicSeason = 'WINTER';
+    state.season.logicSeason = 'SUMMER';
+    state.season.visualFromSeason = 'SUMMER';
+    state.season.visualToSeason = 'WINTER';
     state.ponds.push({
       id: 'claimable-test-job',
       ownerId: 'P2',

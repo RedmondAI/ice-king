@@ -1,10 +1,33 @@
 # GAME_SPEC
 
-Last updated: 2026-02-10
+Last updated: 2026-02-22
 
 ## Current Playable Mode
-- Primary supported mode: `Play vs Computer`.
-- `Create Game` and `Join Game` are UI placeholders for future multiplayer.
+- Supported modes:
+- `Play vs Computer` (local client-first loop).
+- `Create Game` / `Join Game` (two human players over `/api/multiplayer/*` room service).
+- Multiplayer authority currently runs in the Vite host process (in-memory, no persistent backend yet).
+
+## Multiplayer Flow (Current)
+- Lobby contract:
+  - `POST /api/multiplayer/create` returns host room session info and lobby snapshot.
+  - `POST /api/multiplayer/join` joins a known room code and returns guest session.
+  - `POST /api/multiplayer/ready` toggles readiness per player.
+  - `POST /api/multiplayer/start` is host-gated (`P1` only), requires both players ready.
+  - `GET /api/multiplayer/state` polls lobby and state.
+  - `POST /api/multiplayer/action` applies validated gameplay actions.
+- Session semantics:
+  - sessions are token-based (`session.token` + `roomCode` + player id), passed on each multiplayer call;
+  - host is fixed to `P1`;
+  - join/reconnect requires valid token + room code.
+- Reconnect behavior:
+  - disconnected players are tracked with `disconnectedPlayerId`;
+  - during active match pause window, actions return `MATCH_PAUSED`;
+  - after timeout window during active matches, disconnect-forfeit resolves match state.
+- Room lifecycle:
+  - rooms expire after inactivity and return `ROOM_EXPIRED` from state/action/join APIs;
+  - expired response includes readable `details`.
+  - expiry timer defaults to 6 hours (`ICEKING_MULTIPLAYER_ROOM_TTL_MS`) and can be shortened for test runs.
 
 ## Core Loop
 - Expand by buying tiles.

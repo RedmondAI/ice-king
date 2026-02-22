@@ -2,6 +2,56 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-22 (Milestone Update 32)
+- Completed multiplayer flow hardening and automated regression coverage:
+  - `scripts/multiplayer-regression.mjs` now validates `create -> join -> ready -> start -> action -> reconnect -> expiry`.
+  - join no longer short-circuits with placeholder UX; live room entry now works end-to-end.
+  - room-pausing for disconnects and room-expiry (`ROOM_EXPIRED`) are now surfaced from `/api/multiplayer/*`.
+  - root `npm run test` now runs both `game-core` tests and multiplayer regression.
+  - root `npm run build` works in workspace+TS context using `npx tsx` in `apps/client` scripts.
+  - added `scripts/run-multiplayer-ui-regression.mjs` wrapper + Playwright lobby/start action regression scaffold.
+- Files updated:
+  - `scripts/multiplayer-regression.mjs`
+  - `scripts/multiplayer-ui-regression.spec.cjs`
+  - `scripts/run-multiplayer-ui-regression.mjs`
+  - `apps/client/vite.config.ts`
+  - `apps/client/src/app/bootstrap.ts`
+  - `apps/client/package.json`
+  - `package.json`
+  - `iceking.md`
+  - `ARCHITECTURE.md`
+  - `GAME_SPEC.md`
+  - `artstyle.md`
+  - `progress.md`
+- Validation:
+  - `npm run build` -> pass
+  - `npm run test` -> pass
+  - `npm run test:multiplayer:ui` scaffolded, but requires `@playwright/test` resolution in local environment to execute.
+
+## 2026-02-22 (Milestone Update 31)
+- Implemented first-pass online multiplayer create/join flow (replacing splash placeholder path):
+  - Added authoritative in-memory room middleware in `apps/client/vite.config.ts`:
+    - `POST /api/multiplayer/create`
+    - `POST /api/multiplayer/join`
+    - `POST /api/multiplayer/ready`
+    - `POST /api/multiplayer/start`
+    - `GET /api/multiplayer/state`
+    - `POST /api/multiplayer/action`
+  - Added typed client transport in `apps/client/src/multiplayer/client.ts`.
+  - Updated splash + lobby flow in `apps/client/src/app/bootstrap.ts`:
+    - `Create Game` now creates a room and enters lobby.
+    - `Join Game` now prompts for a room code and joins that room.
+    - Human lobbies poll room state, support ready toggles, and host-controlled start.
+    - Lobby auto-enters gameplay once room start is observed.
+  - Updated runtime networking support in `apps/client/src/game/runtime.ts`:
+    - Added multiplayer session sync/poll path.
+    - Gameplay actions post to authoritative room action endpoint.
+    - Camera/select remain local for responsiveness.
+    - Runtime debug mode labels multiplayer runs as `MULTIPLAYER`.
+  - Added engine state replacement hook in `packages/game-core/src/engine.ts` for remote state hydration.
+  - Extended runtime init contract in `apps/client/src/game/types.ts` for multiplayer session + initial state.
+- No tests/build/playwright run in this edit chunk (not requested).
+
 ## 2026-02-22
 - Added summer-only house sale gating:
   - `packages/game-core/src/systems/structureSystem.ts`: `sellIceAtHouse` and `sellBlueIceAtHouse` now fail with `WRONG_SEASON` outside `SUMMER`.

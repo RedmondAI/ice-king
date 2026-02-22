@@ -15,6 +15,12 @@ import { PixelRenderer } from './render/pixelRenderer';
 import type { RuntimeInit, RuntimeOutcome } from './types';
 import { HudLayer } from './ui/hud';
 import { getViewportInfo, screenToTile, tileAt, tileToScreen, TILE_SIZE } from './view';
+import {
+  fetchMultiplayerRoomState,
+  getMultiplayerErrorCode,
+  submitMultiplayerAction,
+  type MultiplayerSession,
+} from '../multiplayer/client';
 import iceKingLogoUrl from '../assets/ui/ice-king-logo.png';
 
 interface FlyingIce {
@@ -90,8 +96,9 @@ export class GameRuntime {
   private readonly minimap: MinimapController;
   private readonly hud: HudLayer;
   private readonly engine: GameEngine;
-  private readonly playerId = 'P1';
-  private readonly botId = 'P2';
+  private readonly multiplayerSession: MultiplayerSession | null;
+  private readonly playerId: 'P1' | 'P2';
+  private readonly botId: 'P1' | 'P2';
   private readonly useExternalBot: boolean;
   private readonly pressedKeys = new Set<string>();
   private readonly floatingIce: FlyingIce[] = [];
@@ -114,6 +121,11 @@ export class GameRuntime {
   private debugOverlay = false;
   private running = false;
   private rafId: number | null = null;
+  private multiplayerPollId: number | null = null;
+  private syncInFlight = false;
+  private lastMultiplayerError: string | null = null;
+  private lastObservedDisconnect: string | null = null;
+  private isMatchPausedByReconnect = false;
   private lastFrameAt = 0;
   private loopAccumulator = 0;
 
@@ -129,19 +141,50 @@ export class GameRuntime {
     this.canvas.tabIndex = 0;
     this.canvas.style.cursor = 'grab';
 
+    this.multiplayerSession = options.multiplayerSession ?? null;
+    this.playerId = this.multiplayerSession?.playerId ?? 'P1';
+    this.botId = this.playerId === 'P1' ? 'P2' : 'P1';
+
     const llmEnabled =
+      !this.multiplayerSession &&
       options.opponentType === 'BOT' &&
       import.meta.env.VITE_DISABLE_LLM_BOT !== '1' &&
       import.meta.env.VITE_ENABLE_LLM_BOT !== '0';
 
     this.useExternalBot = llmEnabled;
 
-    this.engine = GameEngine.createPlayVsComputer(
-      `seed-${Date.now().toString(36)}`,
-      options.humanPlayerName,
-      options.configMode,
-      llmEnabled ? 'EXTERNAL' : 'INTERNAL_HEURISTIC',
-    );
+    if (this.multiplayerSession || options.opponentType === 'HUMAN') {
+      this.engine = new GameEngine({
+        seed: `seed-${Date.now().toString(36)}`,
+        configMode: options.configMode,
+        botControlMode: 'INTERNAL_HEURISTIC',
+        players: [
+          {
+            id: 'P1',
+            name: options.humanPlayerName,
+            color: 'BLUE',
+            controller: 'HUMAN',
+          },
+          {
+            id: 'P2',
+            name: 'Player 2',
+            color: 'RED',
+            controller: 'HUMAN',
+          },
+        ],
+      });
+    } else {
+      this.engine = GameEngine.createPlayVsComputer(
+        `seed-${Date.now().toString(36)}`,
+        options.humanPlayerName,
+        options.configMode,
+        llmEnabled ? 'EXTERNAL' : 'INTERNAL_HEURISTIC',
+      );
+    }
+
+    if (options.initialState) {
+      this.engine.replaceState(options.initialState);
+    }
 
     const state = this.engine.getState();
     const viewport = getViewportInfo(state, this.playerId);
@@ -203,6 +246,12 @@ export class GameRuntime {
   start(): void {
     this.running = true;
     this.lastFrameAt = performance.now();
+    if (this.multiplayerSession) {
+      void this.syncFromServer();
+      this.multiplayerPollId = window.setInterval(() => {
+        void this.syncFromServer();
+      }, 250);
+    }
     this.tickFrame();
   }
 
@@ -211,6 +260,10 @@ export class GameRuntime {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
+    }
+    if (this.multiplayerPollId !== null) {
+      window.clearInterval(this.multiplayerPollId);
+      this.multiplayerPollId = null;
     }
 
     this.minimap.destroy();
@@ -619,10 +672,140 @@ export class GameRuntime {
     }
   }
 
+  private applyRemoteState(nextState: GameState): void {
+    const previous = this.engine.getState();
+    const localCamera = previous.cameraByPlayer[this.playerId];
+    const localSelection = previous.selectedTileByPlayer[this.playerId];
+    this.engine.replaceState(nextState);
+    const synced = this.engine.getState();
+    const camera = synced.cameraByPlayer[this.playerId];
+    if (camera && localCamera) {
+      camera.x = localCamera.x;
+      camera.y = localCamera.y;
+    }
+    if (localSelection) {
+      synced.selectedTileByPlayer[this.playerId] = localSelection;
+    }
+  }
+
+  private async syncFromServer(): Promise<void> {
+    if (!this.multiplayerSession || this.syncInFlight) {
+      return;
+    }
+    this.syncInFlight = true;
+    try {
+      const payload = await fetchMultiplayerRoomState(this.multiplayerSession);
+      const wasPaused = this.isMatchPausedByReconnect;
+      this.isMatchPausedByReconnect = Boolean(payload.lobby.disconnectedPlayerId);
+      this.lastObservedDisconnect = wasPaused ? this.lastObservedDisconnect : payload.lobby.disconnectedPlayerId;
+      if (!wasPaused && payload.lobby.disconnectedPlayerId) {
+        this.lastObservedDisconnect = payload.lobby.disconnectedPlayerId;
+        const resumeInMs = (payload.lobby.timeoutAtMs ?? payload.serverNowMs) - payload.serverNowMs;
+        this.hud.showToast(
+          `Match paused. ${payload.lobby.disconnectedPlayerId} disconnected. Resume in ${Math.max(0, Math.ceil(resumeInMs / 1000))}s.`,
+        );
+      }
+      if (wasPaused && !payload.lobby.disconnectedPlayerId && this.lastObservedDisconnect) {
+        this.hud.showToast('Match resumed.');
+      }
+      if (payload.state) {
+        this.applyRemoteState(payload.state);
+      }
+      this.lastMultiplayerError = null;
+      this.updateHud();
+      this.updateActionPanel();
+    } catch (error) {
+      const code = getMultiplayerErrorCode(error);
+      if (code === 'ROOM_EXPIRED' || code === 'ROOM_NOT_FOUND' || code === 'UNAUTHORIZED') {
+        const details =
+          error instanceof Error && error.message.length > 0 ? ` ${error.message}` : ' session was removed.';
+        const reason = code === 'ROOM_EXPIRED' ? `Room expired.${details}` : `Multiplayer session ended.${details}`;
+        this.hud.showToast(reason);
+        this.onMultiplayerSessionTerminated(reason);
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== this.lastMultiplayerError) {
+        this.hud.showToast(`Multiplayer sync failed: ${message}`);
+      }
+      this.lastMultiplayerError = message;
+    } finally {
+      this.syncInFlight = false;
+    }
+  }
+
+  private async sendMultiplayerAction(action: GameAction): Promise<void> {
+    if (!this.multiplayerSession) {
+      return;
+    }
+    if (this.isMatchPausedByReconnect) {
+      this.hud.showToast('Match paused while opponent reconnects.');
+      return;
+    }
+    try {
+      const payload = await submitMultiplayerAction(this.multiplayerSession, action);
+      this.isMatchPausedByReconnect = Boolean(payload.lobby.disconnectedPlayerId);
+      if (payload.state) {
+        this.applyRemoteState(payload.state);
+      }
+      if (!payload.result.ok) {
+        this.hud.showToast(payload.result.message);
+      }
+      this.lastMultiplayerError = null;
+      this.updateHud();
+      this.updateActionPanel();
+    } catch (error) {
+      const code = getMultiplayerErrorCode(error);
+      if (code === 'ROOM_EXPIRED' || code === 'ROOM_NOT_FOUND' || code === 'UNAUTHORIZED') {
+        const details =
+          error instanceof Error && error.message.length > 0 ? ` ${error.message}` : ' session was removed.';
+        const reason = code === 'ROOM_EXPIRED' ? `Room expired.${details}` : `Multiplayer session ended.${details}`;
+        this.hud.showToast(reason);
+        this.onMultiplayerSessionTerminated(reason);
+        return;
+      }
+      if (code === 'MATCH_PAUSED') {
+        this.isMatchPausedByReconnect = true;
+        this.hud.showToast(`Match paused: ${error instanceof Error ? error.message : 'Match paused.'}`);
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      this.hud.showToast(`Multiplayer action failed: ${message}`);
+      this.lastMultiplayerError = message;
+    }
+  }
+
+  private onMultiplayerSessionTerminated(reason = 'Multiplayer session ended.'): void {
+    this.destroy();
+    if (this.running) {
+      this.running = false;
+    }
+    this.opts.onExit({
+      winnerName: null,
+      reason,
+    });
+  }
+
   private dispatchAction(action: GameAction): ActionResult {
+    if (
+      this.multiplayerSession &&
+      this.isMatchPausedByReconnect &&
+      action.type !== 'camera.move' &&
+      action.type !== 'tile.select'
+    ) {
+      this.hud.showToast('Match paused while opponent reconnects.');
+      return {
+        ok: false,
+        code: 'MATCH_PAUSED',
+        message: 'Match is paused waiting for reconnect.',
+      };
+    }
     const result = this.engine.applyAction(action, 'PLAYER');
     if (!result.ok) {
       this.hud.showToast(result.message);
+    }
+    if (result.ok && this.multiplayerSession && action.type !== 'camera.move' && action.type !== 'tile.select') {
+      void this.sendMultiplayerAction(action);
     }
 
     this.updateHud();
@@ -859,6 +1042,11 @@ export class GameRuntime {
   private updateHud(): void {
     const split = this.engine.getPlayerStorage(this.playerId);
     const state = this.engine.getState();
+    const runtimeMode = this.multiplayerSession
+      ? 'MULTIPLAYER'
+      : this.useExternalBot
+        ? 'LLM_EXTERNAL'
+        : 'INTERNAL_HEURISTIC';
     this.hud.updateStats(state, this.playerId, {
       refrigerated: split.refrigeratedIce,
       unrefrigerated: split.unrefrigeratedIce,
@@ -880,8 +1068,8 @@ export class GameRuntime {
         `transition: ${(state.season.transitionProgress * 100).toFixed(1)}%`,
         `keyframe: ${state.season.transitionKeyframeIndex}/8`,
         `room: ${this.opts.roomCode}`,
-        `botMode: ${this.useExternalBot ? 'LLM_EXTERNAL' : 'INTERNAL_HEURISTIC'}`,
-        `latency(ms): local-0`,
+        `botMode: ${runtimeMode}`,
+        `latency(ms): ${this.multiplayerSession ? 'remote-poll' : 'local-0'}`,
         `botTokensIn: ${this.botTokenStats.inputTokensSent}`,
         `botTokensOut: ${this.botTokenStats.outputTokensReceived}`,
         `botTokensTotal: ${this.botTokenStats.totalTokens}`,
@@ -916,10 +1104,11 @@ export class GameRuntime {
 
   private tickFixed(stepMs: number): void {
     this.processCameraInput(stepMs);
-    this.engine.tick(stepMs);
-
-    if (this.botDirector) {
-      this.botDirector.update(this.engine.getState());
+    if (!this.multiplayerSession) {
+      this.engine.tick(stepMs);
+      if (this.botDirector) {
+        this.botDirector.update(this.engine.getState());
+      }
     }
 
     this.updateHud();
@@ -1061,7 +1250,11 @@ export class GameRuntime {
             payload: entry.payload,
           })),
           bot: {
-            mode: this.useExternalBot ? 'LLM_EXTERNAL' : 'INTERNAL_HEURISTIC',
+            mode: this.multiplayerSession
+              ? 'MULTIPLAYER'
+              : this.useExternalBot
+                ? 'LLM_EXTERNAL'
+                : 'INTERNAL_HEURISTIC',
           },
         });
       },

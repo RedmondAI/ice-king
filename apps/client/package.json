@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "npx -y tsx node_modules/vite/bin/vite.js",
+    "build": "npx -y tsx node_modules/vite/bin/vite.js build",
+    "preview": "npx -y tsx node_modules/vite/bin/vite.js preview"
   },
   "dependencies": {
     "@ice-king/config": "0.1.0",

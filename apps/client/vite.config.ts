@@ -1,5 +1,8 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { GameEngine } from '@ice-king/game-core';
+import { GameActionSchema, type ActionResult, type GameAction, type GameState } from '@ice-king/shared';
 
 function readBody(req: NodeJS.ReadableStream, maxBytes = 512 * 1024): Promise<string> {
   return new Promise((resolveBody, rejectBody) => {
@@ -85,6 +88,49 @@ interface BotUsageResponse {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+}
+
+type MultiplayerPlayerId = 'P1' | 'P2';
+
+interface MultiplayerRoomPlayer {
+  id: MultiplayerPlayerId;
+  name: string;
+  token: string;
+  ready: boolean;
+  connected: boolean;
+  joinedAtMs: number;
+  lastSeenMs: number;
+}
+
+interface MultiplayerLobbySnapshot {
+  roomCode: string;
+  started: boolean;
+  hostPlayerId: MultiplayerPlayerId;
+  disconnectedPlayerId: string | null;
+  pausedAtMs: number | null;
+  timeoutAtMs: number | null;
+  players: {
+    P1: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
+    P2: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
+  };
+}
+
+interface MultiplayerRoom {
+  roomCode: string;
+  configMode: 'PROD' | 'DEV_FAST';
+  engine: GameEngine;
+  createdAtMs: number;
+  updatedAtMs: number;
+  lastTickAtMs: number;
+  started: boolean;
+  reconnectPauseMs: number;
+  disconnectedPlayerId: string | null;
+  pausedAtMs: number | null;
+  timeoutAtMs: number | null;
+  players: {
+    P1: MultiplayerRoomPlayer;
+    P2: MultiplayerRoomPlayer | null;
+  };
 }
 
 function extractOutputText(result: ResponsesApiResult): string {
@@ -257,6 +303,623 @@ function requestIp(req: { headers?: Record<string, unknown>; socket?: { remoteAd
     return raw[0].split(',')[0]?.trim() ?? 'unknown';
   }
   return req.socket?.remoteAddress ?? 'unknown';
+}
+
+const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function normalizeRoomCode(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+
+function randomRoomCode(): string {
+  let code = '';
+  for (let i = 0; i < 6; i += 1) {
+    const index = Math.floor(Math.random() * ROOM_CODE_CHARS.length);
+    code += ROOM_CODE_CHARS[index] ?? 'A';
+  }
+  return code;
+}
+
+function createUniqueRoomCode(rooms: Map<string, MultiplayerRoom>): string | null {
+  for (let i = 0; i < 40; i += 1) {
+    const code = randomRoomCode();
+    if (!rooms.has(code)) {
+      return code;
+    }
+  }
+  return null;
+}
+
+function playerToken(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+function sanitizePlayerName(raw: unknown, fallback: string): string {
+  const value = typeof raw === 'string' ? raw.trim().slice(0, 24) : '';
+  return value.length > 0 ? value : fallback;
+}
+
+function syncRoomPresence(room: MultiplayerRoom): void {
+  const state = room.engine.getState();
+  const p1 = room.players.P1;
+  const p2 = room.players.P2;
+
+  const stateP1 = state.players.P1;
+  if (stateP1) {
+    stateP1.name = p1.name;
+    stateP1.connected = p1.connected;
+    stateP1.ready = p1.ready;
+    stateP1.controller = 'HUMAN';
+  }
+
+  const stateP2 = state.players.P2;
+  if (stateP2) {
+    if (p2) {
+      stateP2.name = p2.name;
+      stateP2.connected = p2.connected;
+      stateP2.ready = p2.ready;
+    } else {
+      stateP2.name = 'Waiting for player...';
+      stateP2.connected = false;
+      stateP2.ready = false;
+    }
+    stateP2.controller = 'HUMAN';
+  }
+}
+
+function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
+  const p1 = room.players.P1;
+  const p2 = room.players.P2;
+  return {
+    roomCode: room.roomCode,
+    started: room.started,
+    hostPlayerId: 'P1',
+    players: {
+      P1: {
+        id: p1.id,
+        name: p1.name,
+        ready: p1.ready,
+        connected: p1.connected,
+      },
+      P2: p2
+        ? {
+            id: p2.id,
+            name: p2.name,
+            ready: p2.ready,
+            connected: p2.connected,
+          }
+        : null,
+    },
+    disconnectedPlayerId: room.disconnectedPlayerId,
+    pausedAtMs: room.pausedAtMs,
+    timeoutAtMs: room.timeoutAtMs,
+  };
+}
+
+function tickRoom(room: MultiplayerRoom, nowMs: number): void {
+  if (!room.started) {
+    room.lastTickAtMs = nowMs;
+    return;
+  }
+  const deltaMs = Math.max(0, nowMs - room.lastTickAtMs);
+  if (deltaMs > 0) {
+    room.engine.tick(deltaMs);
+    room.lastTickAtMs = nowMs;
+  }
+}
+
+function pruneStaleRooms(rooms: Map<string, MultiplayerRoom>, nowMs: number, ttlMs: number): void {
+  for (const [roomCode, room] of rooms) {
+    if (nowMs - room.updatedAtMs > ttlMs) {
+      rooms.delete(roomCode);
+    }
+  }
+}
+
+function findPlayerByToken(room: MultiplayerRoom, token: string): MultiplayerRoomPlayer | null {
+  if (room.players.P1.token === token) {
+    return room.players.P1;
+  }
+  if (room.players.P2?.token === token) {
+    return room.players.P2;
+  }
+  return null;
+}
+
+function jsonResponse(res: any, statusCode: number, payload: Record<string, unknown>): void {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(payload));
+}
+
+function isRoomExpired(room: MultiplayerRoom, nowMs: number, ttlMs: number): boolean {
+  return nowMs - room.updatedAtMs > ttlMs;
+}
+
+function buildMatchPausedPayload(
+  room: MultiplayerRoom,
+  nowMs: number,
+): {
+  error: 'MATCH_PAUSED';
+  disconnectedPlayerId: string | null;
+  timeoutAtMs: number | null;
+  details: string;
+} {
+  const remainingMs = room.timeoutAtMs !== null ? Math.max(0, room.timeoutAtMs - nowMs) : null;
+  const remainingSeconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
+  const playerLabel = room.disconnectedPlayerId ?? 'an opponent';
+  const details =
+    remainingSeconds !== null
+      ? `${playerLabel} is disconnected. Match paused; resume in ${remainingSeconds}s.`
+      : `${playerLabel} is disconnected. Match paused; awaiting reconnect.`;
+
+  return {
+    error: 'MATCH_PAUSED',
+    disconnectedPlayerId: room.disconnectedPlayerId,
+    timeoutAtMs: room.timeoutAtMs,
+    details,
+  };
+}
+
+function markPlayerHeartbeat(room: MultiplayerRoom, player: MultiplayerRoomPlayer, nowMs: number): void {
+  player.connected = true;
+  player.lastSeenMs = nowMs;
+}
+
+function getRoomIfFresh(
+  rooms: Map<string, MultiplayerRoom>,
+  roomCode: string,
+  nowMs: number,
+  ttlMs: number,
+): {
+  room: MultiplayerRoom | null;
+  expired: boolean;
+  details?: string;
+} {
+  const room = rooms.get(roomCode);
+  if (!room) {
+    return { room: null, expired: false };
+  }
+
+  if (isRoomExpired(room, nowMs, ttlMs)) {
+    const expiryMinutes = Math.max(1, Math.ceil(ttlMs / 60_000));
+    rooms.delete(roomCode);
+    return {
+      room: null,
+      expired: true,
+      details: `This room expired after ${expiryMinutes} minute${expiryMinutes === 1 ? '' : 's'} of inactivity.`,
+    };
+  }
+
+  return { room, expired: false };
+}
+
+function refreshDisconnectedState(room: MultiplayerRoom, nowMs: number): void {
+  const state = room.engine.getState();
+
+  if (state.match.ended) {
+    room.disconnectedPlayerId = null;
+    room.pausedAtMs = null;
+    room.timeoutAtMs = null;
+    state.match.paused = false;
+    return;
+  }
+
+  const players = [room.players.P1, room.players.P2].filter((p): p is MultiplayerRoomPlayer => Boolean(p));
+  for (const player of players) {
+    if (player.connected && nowMs - player.lastSeenMs > room.reconnectPauseMs) {
+      player.connected = false;
+    }
+  }
+
+  const disconnectedPlayers = players.filter((player) => !player.connected);
+  if (disconnectedPlayers.length === 0) {
+    room.disconnectedPlayerId = null;
+    room.pausedAtMs = null;
+    room.timeoutAtMs = null;
+    if (room.started) {
+      state.match.paused = false;
+    }
+    return;
+  }
+
+  if (!room.disconnectedPlayerId || room.disconnectedPlayerId === disconnectedPlayers[0]?.id || !room.started) {
+    room.disconnectedPlayerId = disconnectedPlayers[0]?.id ?? null;
+    if (!room.pausedAtMs) {
+      room.pausedAtMs = nowMs;
+      room.timeoutAtMs = nowMs + room.reconnectPauseMs;
+    } else {
+      room.pausedAtMs = room.pausedAtMs ?? nowMs;
+      room.timeoutAtMs = room.timeoutAtMs ?? nowMs + room.reconnectPauseMs;
+    }
+  } else {
+    room.disconnectedPlayerId = disconnectedPlayers[0]?.id ?? null;
+    room.pausedAtMs = nowMs;
+    room.timeoutAtMs = nowMs + room.reconnectPauseMs;
+  }
+
+  if (room.started && disconnectedPlayers.length > 0) {
+    state.match.paused = true;
+  }
+
+  if (room.started && room.timeoutAtMs !== null && nowMs >= room.timeoutAtMs && room.disconnectedPlayerId) {
+    room.engine.applyAction(
+      {
+        type: 'player.forfeit',
+        playerId: room.disconnectedPlayerId,
+      },
+      'PLAYER',
+    );
+    room.disconnectedPlayerId = null;
+    room.pausedAtMs = null;
+    room.timeoutAtMs = null;
+    state.match.paused = false;
+  }
+}
+
+function multiplayerRoomPayload(room: MultiplayerRoom, nowMs: number): {
+  serverNowMs: number;
+  lobby: MultiplayerLobbySnapshot;
+  state: GameState | null;
+} {
+  tickRoom(room, nowMs);
+  return {
+    serverNowMs: nowMs,
+    lobby: toLobbySnapshot(room),
+    state: room.started ? room.engine.getState() : null,
+  };
+}
+
+function multiplayerMiddleware(env: EnvMap): Plugin {
+  const rooms = new Map<string, MultiplayerRoom>();
+  const roomTtlMs = Math.max(
+    60_000,
+    Number.isFinite(Number(env.ICEKING_MULTIPLAYER_ROOM_TTL_MS))
+      ? Number(env.ICEKING_MULTIPLAYER_ROOM_TTL_MS)
+      : 6 * 60 * 60 * 1000,
+  );
+  const maxRooms = Math.max(
+    10,
+    Number.isFinite(Number(env.ICEKING_MULTIPLAYER_MAX_ROOMS))
+      ? Number(env.ICEKING_MULTIPLAYER_MAX_ROOMS)
+      : 500,
+  );
+  const maxBodyBytes = Math.max(
+    1024,
+    Number.isFinite(Number(env.ICEKING_MULTIPLAYER_MAX_BODY_BYTES))
+      ? Number(env.ICEKING_MULTIPLAYER_MAX_BODY_BYTES)
+      : 256 * 1024,
+  );
+  const reconnectPauseMs = Math.max(
+    5_000,
+    Number.isFinite(Number(env.ICEKING_MULTIPLAYER_RECONNECT_PAUSE_MS))
+      ? Number(env.ICEKING_MULTIPLAYER_RECONNECT_PAUSE_MS)
+      : 90_000,
+  );
+
+  const handler = async (req: any, res: any): Promise<void> => {
+    try {
+      const nowMs = Date.now();
+
+      const method = String(req.method ?? 'GET').toUpperCase();
+      const url = new URL(req.url ?? '/', 'http://localhost');
+      const path = url.pathname;
+
+      if (path === '/create' && method === 'POST') {
+        const body = JSON.parse(await readBody(req, maxBodyBytes)) as Record<string, unknown>;
+        const playerName = sanitizePlayerName(body.playerName, 'Player 1');
+        const configMode = body.configMode === 'DEV_FAST' ? 'DEV_FAST' : 'PROD';
+        const preferredRoomCode = normalizeRoomCode(String(body.preferredRoomCode ?? ''));
+
+        const roomCode = preferredRoomCode || createUniqueRoomCode(rooms);
+        if (!roomCode) {
+          jsonResponse(res, 503, { error: 'ROOM_CODE_UNAVAILABLE' });
+          return;
+        }
+
+        if (rooms.has(roomCode)) {
+          jsonResponse(res, 409, { error: 'ROOM_CODE_IN_USE' });
+          return;
+        }
+
+        if (rooms.size >= maxRooms) {
+          jsonResponse(res, 503, { error: 'ROOM_CAPACITY_REACHED' });
+          return;
+        }
+
+        const hostPlayer: MultiplayerRoomPlayer = {
+          id: 'P1',
+          name: playerName,
+          token: playerToken(),
+          ready: false,
+          connected: true,
+          joinedAtMs: nowMs,
+          lastSeenMs: nowMs,
+        };
+
+        const engine = new GameEngine({
+          configMode,
+          botControlMode: 'INTERNAL_HEURISTIC',
+          seed: `room-${roomCode}-${nowMs.toString(36)}`,
+          players: [
+            {
+              id: 'P1',
+              name: hostPlayer.name,
+              color: 'BLUE',
+              controller: 'HUMAN',
+            },
+            {
+              id: 'P2',
+              name: 'Waiting for player...',
+              color: 'RED',
+              controller: 'HUMAN',
+            },
+          ],
+        });
+
+        const room: MultiplayerRoom = {
+          roomCode,
+          configMode,
+          engine,
+          createdAtMs: nowMs,
+          updatedAtMs: nowMs,
+          lastTickAtMs: nowMs,
+          started: false,
+          reconnectPauseMs,
+          disconnectedPlayerId: null,
+          pausedAtMs: null,
+          timeoutAtMs: null,
+          players: {
+            P1: hostPlayer,
+            P2: null,
+          },
+        };
+        syncRoomPresence(room);
+        rooms.set(roomCode, room);
+
+        jsonResponse(res, 200, {
+          session: {
+            roomCode,
+            playerId: hostPlayer.id,
+            token: hostPlayer.token,
+          },
+          ...multiplayerRoomPayload(room, nowMs),
+        });
+        return;
+      }
+
+      if (path === '/join' && method === 'POST') {
+        const body = JSON.parse(await readBody(req, maxBodyBytes)) as Record<string, unknown>;
+        const roomCode = normalizeRoomCode(String(body.roomCode ?? ''));
+        const { room, expired, details } = getRoomIfFresh(rooms, roomCode, nowMs, roomTtlMs);
+        if (!room) {
+          jsonResponse(res, 404, {
+            error: expired ? 'ROOM_EXPIRED' : 'ROOM_NOT_FOUND',
+            ...(details ? { details } : {}),
+          });
+          return;
+        }
+
+        if (room.players.P2 && room.players.P2.connected) {
+          jsonResponse(res, 409, { error: 'ROOM_FULL' });
+          return;
+        }
+
+        refreshDisconnectedState(room, nowMs);
+        const joiner: MultiplayerRoomPlayer = {
+          id: 'P2',
+          name: sanitizePlayerName(body.playerName, 'Player 2'),
+          token: playerToken(),
+          ready: false,
+          connected: true,
+          joinedAtMs: nowMs,
+          lastSeenMs: nowMs,
+        };
+
+        room.players.P2 = joiner;
+        room.disconnectedPlayerId = null;
+        room.pausedAtMs = null;
+        room.timeoutAtMs = null;
+        room.engine.getState().match.paused = false;
+        room.updatedAtMs = nowMs;
+        syncRoomPresence(room);
+
+        jsonResponse(res, 200, {
+          session: {
+            roomCode: room.roomCode,
+            playerId: joiner.id,
+            token: joiner.token,
+          },
+          ...multiplayerRoomPayload(room, nowMs),
+        });
+        return;
+      }
+
+      if (path === '/ready' && method === 'POST') {
+        const body = JSON.parse(await readBody(req, maxBodyBytes)) as Record<string, unknown>;
+        const roomCode = normalizeRoomCode(String(body.roomCode ?? ''));
+        const { room, expired, details } = getRoomIfFresh(rooms, roomCode, nowMs, roomTtlMs);
+        if (!room) {
+          jsonResponse(res, 404, {
+            error: expired ? 'ROOM_EXPIRED' : 'ROOM_NOT_FOUND',
+            ...(details ? { details } : {}),
+          });
+          return;
+        }
+        const player = findPlayerByToken(room, String(body.token ?? ''));
+        if (!player) {
+          jsonResponse(res, 401, { error: 'UNAUTHORIZED' });
+          return;
+        }
+
+        markPlayerHeartbeat(room, player, nowMs);
+        refreshDisconnectedState(room, nowMs);
+        if (room.disconnectedPlayerId) {
+          jsonResponse(res, 409, buildMatchPausedPayload(room, nowMs));
+          return;
+        }
+
+        player.ready = Boolean(body.ready);
+        room.updatedAtMs = nowMs;
+        syncRoomPresence(room);
+        jsonResponse(res, 200, multiplayerRoomPayload(room, nowMs));
+        return;
+      }
+
+      if (path === '/start' && method === 'POST') {
+        const body = JSON.parse(await readBody(req, maxBodyBytes)) as Record<string, unknown>;
+        const roomCode = normalizeRoomCode(String(body.roomCode ?? ''));
+        const { room, expired, details } = getRoomIfFresh(rooms, roomCode, nowMs, roomTtlMs);
+        if (!room) {
+          jsonResponse(res, 404, {
+            error: expired ? 'ROOM_EXPIRED' : 'ROOM_NOT_FOUND',
+            ...(details ? { details } : {}),
+          });
+          return;
+        }
+        const player = findPlayerByToken(room, String(body.token ?? ''));
+        if (!player) {
+          jsonResponse(res, 401, { error: 'UNAUTHORIZED' });
+          return;
+        }
+
+        markPlayerHeartbeat(room, player, nowMs);
+        refreshDisconnectedState(room, nowMs);
+        if (room.disconnectedPlayerId) {
+          jsonResponse(res, 409, buildMatchPausedPayload(room, nowMs));
+          return;
+        }
+        if (player.id !== 'P1') {
+          jsonResponse(res, 403, { error: 'ONLY_HOST_CAN_START' });
+          return;
+        }
+        if (!room.players.P2) {
+          jsonResponse(res, 409, { error: 'PLAYER_TWO_NOT_JOINED' });
+          return;
+        }
+        if (!room.players.P1.ready || !room.players.P2.ready) {
+          jsonResponse(res, 409, { error: 'BOTH_PLAYERS_MUST_BE_READY' });
+          return;
+        }
+
+        room.started = true;
+        room.lastTickAtMs = nowMs;
+        room.updatedAtMs = nowMs;
+        syncRoomPresence(room);
+        jsonResponse(res, 200, multiplayerRoomPayload(room, nowMs));
+        return;
+      }
+
+      if (path === '/state' && method === 'GET') {
+        const roomCode = normalizeRoomCode(url.searchParams.get('roomCode') ?? '');
+        const token = String(url.searchParams.get('token') ?? '');
+        const { room, expired, details } = getRoomIfFresh(rooms, roomCode, nowMs, roomTtlMs);
+        if (!room) {
+          jsonResponse(res, 404, {
+            error: expired ? 'ROOM_EXPIRED' : 'ROOM_NOT_FOUND',
+            ...(details ? { details } : {}),
+          });
+          return;
+        }
+        const player = findPlayerByToken(room, token);
+        if (!player) {
+          jsonResponse(res, 401, { error: 'UNAUTHORIZED' });
+          return;
+        }
+
+        markPlayerHeartbeat(room, player, nowMs);
+        refreshDisconnectedState(room, nowMs);
+        room.updatedAtMs = nowMs;
+        syncRoomPresence(room);
+        jsonResponse(res, 200, multiplayerRoomPayload(room, nowMs));
+        return;
+      }
+
+      if (path === '/action' && method === 'POST') {
+        const body = JSON.parse(await readBody(req, maxBodyBytes)) as Record<string, unknown>;
+        const roomCode = normalizeRoomCode(String(body.roomCode ?? ''));
+        const { room, expired, details } = getRoomIfFresh(rooms, roomCode, nowMs, roomTtlMs);
+        if (!room) {
+          jsonResponse(res, 404, {
+            error: expired ? 'ROOM_EXPIRED' : 'ROOM_NOT_FOUND',
+            ...(details ? { details } : {}),
+          });
+          return;
+        }
+        const player = findPlayerByToken(room, String(body.token ?? ''));
+        if (!player) {
+          jsonResponse(res, 401, { error: 'UNAUTHORIZED' });
+          return;
+        }
+
+        markPlayerHeartbeat(room, player, nowMs);
+        refreshDisconnectedState(room, nowMs);
+        if (room.disconnectedPlayerId) {
+          jsonResponse(res, 409, buildMatchPausedPayload(room, nowMs));
+          return;
+        }
+
+        if (!room.started) {
+          jsonResponse(res, 409, { error: 'MATCH_NOT_STARTED' });
+          return;
+        }
+
+        tickRoom(room, nowMs);
+
+        const baseAction =
+          body.action && typeof body.action === 'object'
+            ? (body.action as Record<string, unknown>)
+            : {};
+        const normalizedAction = {
+          ...baseAction,
+          playerId: player.id,
+        };
+
+        const parsed = GameActionSchema.safeParse(normalizedAction);
+        let result: ActionResult;
+        if (!parsed.success) {
+          result = {
+            ok: false,
+            code: 'INVALID_ACTION',
+            message: 'Action payload failed schema validation.',
+          };
+        } else {
+          result = room.engine.applyAction(parsed.data as GameAction, 'PLAYER');
+        }
+
+        room.updatedAtMs = nowMs;
+        syncRoomPresence(room);
+        jsonResponse(res, 200, {
+          ...multiplayerRoomPayload(room, nowMs),
+          result,
+        });
+        return;
+      }
+
+      if (['/create', '/join', '/ready', '/start', '/state', '/action'].includes(path)) {
+        jsonResponse(res, 405, { error: 'METHOD_NOT_ALLOWED' });
+        return;
+      }
+
+      jsonResponse(res, 404, { error: 'NOT_FOUND' });
+    } catch (error) {
+      const details = error instanceof Error ? error.message : String(error);
+      jsonResponse(res, 400, {
+        error: 'MULTIPLAYER_HANDLER_ERROR',
+        details,
+      });
+    }
+  };
+
+  return {
+    name: 'ice-king-multiplayer',
+    configureServer(server) {
+      server.middlewares.use('/api/multiplayer', handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use('/api/multiplayer', handler);
+    },
+  };
 }
 
 function openAiBotMiddleware(env: EnvMap): Plugin {
@@ -585,7 +1248,7 @@ export default defineConfig(({ mode }) => {
   const allowedHosts = parseAllowedHosts(env.ICEKING_ALLOWED_HOSTS);
 
   return {
-    plugins: [openAiBotMiddleware(env)],
+    plugins: [openAiBotMiddleware(env), multiplayerMiddleware(env)],
     resolve: {
       alias: {
         '@ice-king/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),

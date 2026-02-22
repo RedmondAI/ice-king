@@ -9,8 +9,11 @@
   "scripts": {
     "dev": "npm run dev -w @ice-king/client",
     "build": "npm run build -w @ice-king/client",
+    "test:multiplayer": "node scripts/multiplayer-regression.mjs",
+    "test:multiplayer:ui": "node scripts/run-multiplayer-ui-regression.mjs",
+    "test:multiplayer:all": "npm run test:multiplayer && npm run test:multiplayer:ui",
     "start": "npm run preview -w @ice-king/client -- --host 0.0.0.0 --port ${PORT:-4173}",
-    "test": "npm run test -w @ice-king/game-core"
+    "test": "npm run test -w @ice-king/game-core && npm run test:multiplayer"
   },
   "devDependencies": {
     "@types/node": "^25.2.2",

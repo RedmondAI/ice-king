@@ -86,6 +86,10 @@ export class GameEngine {
     return this.state;
   }
 
+  replaceState(nextState: GameState): void {
+    this.state = nextState;
+  }
+
   getNetWorth(): NetWorthBreakdown[] {
     return computeNetWorth(this.state, this.config).sort((a, b) => b.value - a.value);
   }

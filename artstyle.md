@@ -1,6 +1,12 @@
 # Art Style Specification
 
-Last updated: 2026-02-10
+Last updated: 2026-02-22
+
+## Update Note (Current Sprint)
+- No new art rule changes in this milestone; existing pixel/asset contracts remain:
+  - 256x256 tile assets,
+  - 768x768 3x3 transition sheets,
+  - no frame/border gutters and strict tile-edge continuity.
 
 ## Core Direction
 - Top-down pixel-art strategy style.
