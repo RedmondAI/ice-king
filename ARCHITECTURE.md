@@ -48,7 +48,7 @@ Last updated: 2026-02-10
 - `economySystem`
 - Tile purchases/buyouts, melt logic, net worth.
 - `pondSystem`
-- Harvest start/claim lifecycle (timed completion; winter-only start constraint).
+  - Harvest start/claim lifecycle (timed completion; starts are allowed any season, with summer starts yielding half ice output).
 - `structureSystem`
 - Build actions, house sales, train shipment, factory crafting jobs.
 - `botSystem`
@@ -60,11 +60,11 @@ Last updated: 2026-02-10
 - Main map: single `canvas` (`#game-canvas`) filling a centered square stage that scales uniformly to fit the browser window (max `1280 x 1280`).
 - Tile rendering uses `256x256` tile assets with `5x5` viewport draw.
 - Background grass texture is world-anchored and scrolls with camera pan.
-- Minimap is separate canvas in lower-right.
+- Minimap is separate canvas in the right-side control rail (outside the main game area).
 - Minimap keeps terrain color by tile type and overlays owner identity with larger standalone red/blue checkmarks.
-- DOM overlay layer sits above canvas and contains:
-- Instructions panel (top-right, above Stats; collapsed by default).
-- Stats HUD (top-right, collapsible).
+- DOM overlay layer sits above canvas and includes a dedicated right-side control rail that contains:
+  - Instructions panel (above Stats; collapsed by default).
+  - Stats HUD (collapsible).
 - Tile action popup host (small action menu anchored above clicked tiles, shown on second click).
 - Season bar, toasts, debug overlay.
 - Tile job overlay panel (progress frame + label + remaining time + chunked progress fill) for active pond/factory jobs.

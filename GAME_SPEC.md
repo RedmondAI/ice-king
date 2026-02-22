@@ -8,7 +8,7 @@ Last updated: 2026-02-10
 
 ## Core Loop
 - Expand by buying tiles.
-- Control ponds in winter and start harvest jobs.
+- Control ponds and start harvest jobs in any season (summer starts yield half ice).
 - Claim harvest output when ready (default `1:00`).
 - Protect regular ice with refrigerators.
 - Build factories and man-made ponds on owned `GRASS`/`FOREST`.
@@ -22,7 +22,7 @@ Last updated: 2026-02-10
 - Buyout tile: `tile.currentPrice + $1` fee.
 - Build factory: `2 ice + $2`.
 - Build man-made pond: `1 ice + $2`.
-- Pond harvest start (winter only): `$1`.
+- Pond harvest start: `$1` (summer start yields half ice).
 - House sell:
 - Ice: `$2` each.
 - Blue ice: `$8` each.
@@ -61,7 +61,7 @@ Last updated: 2026-02-10
 - Display sizing:
 - Game view is a centered square stage that scales uniformly to fit the browser window (max `1280 x 1280`, letterboxing allowed).
 - Minimap:
-- Bottom-right.
+- Right-side rail (outside game area), bottom segment.
 - Playable-area preview (non-interactable `VOID` border tiles are hidden).
 - Red camera rectangle.
 - Click/drag to move camera.
@@ -96,7 +96,7 @@ Last updated: 2026-02-10
 - Above Stats, collapsed by default.
 - Provides a themed summary of the rules and controls.
 - Stats panel:
-- Top-right, collapsible, above map layer.
+- In a right-side rail outside the game area, collapsible, above map layer.
 - Shows money, ice, blue ice, refrigerators, refrigerated split, season, and train window status.
 - Tile action menu:
 - Hidden by default.

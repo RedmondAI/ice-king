@@ -82,6 +82,7 @@ export interface PondHarvestJob {
   pondY: number;
   ownerId: string;
   status: PondJobStatus;
+  harvestIceYield: number;
   createdAtMs: number;
   claimAtMs: number;
   claimedAtMs: number | null;

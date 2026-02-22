@@ -83,6 +83,7 @@ export class GameRuntime {
   private readonly opts: RuntimeInit;
   private readonly gameLayer: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
+  private readonly sideRail: HTMLDivElement;
   private readonly minimapFrame: HTMLDivElement;
   private readonly minimapCanvas: HTMLCanvasElement;
   private readonly renderer: PixelRenderer;
@@ -148,18 +149,22 @@ export class GameRuntime {
     this.renderer = new PixelRenderer(this.canvas);
     this.renderer.resize(viewport.canvasWidth, viewport.canvasHeight);
 
+    this.sideRail = document.createElement('div');
+    this.sideRail.className = 'game-side-rail';
+
     this.minimapFrame = document.createElement('div');
     this.minimapFrame.className = 'minimap-frame pixel-panel';
     this.minimapCanvas = document.createElement('canvas');
     this.minimapCanvas.id = 'minimap-canvas';
     this.minimapFrame.append(this.minimapCanvas);
+    this.sideRail.append(this.minimapFrame);
 
     const logoBadge = document.createElement('img');
     logoBadge.className = 'game-logo-badge';
     logoBadge.src = iceKingLogoUrl;
     logoBadge.alt = 'Ice King logo';
 
-    this.hud = new HudLayer(this.gameLayer, this.handlePopupAction);
+    this.hud = new HudLayer(this.gameLayer, this.handlePopupAction, this.sideRail);
 
     this.minimap = new MinimapController(this.minimapCanvas, (x, y) => {
       this.dispatchAction({
@@ -170,7 +175,7 @@ export class GameRuntime {
       });
     });
 
-    this.gameLayer.append(this.canvas, this.minimapFrame, logoBadge);
+    this.gameLayer.append(this.canvas, this.sideRail, logoBadge);
 
     if (this.useExternalBot) {
       this.botDirector = new BotDirector({
@@ -731,14 +736,13 @@ export class GameRuntime {
         entry.status !== 'CLAIMED',
     );
 
-    if (
-      tile.ownerId === this.playerId &&
-      tile.type === 'POND' &&
-      state.season.logicSeason === 'WINTER' &&
-      !hasPendingPondJob
-    ) {
+    if (tile.ownerId === this.playerId && tile.type === 'POND' && !hasPendingPondJob) {
+      const isSummer = state.season.logicSeason === 'SUMMER';
+      const summerNote = isSummer ? ' You will collect half as much ice in summer.' : '';
       this.hud.setPondPopup({
-        text: `Spend $1c to start a ${formatMmSs(this.engine.config.timing.pondHarvestDurationMs)} harvest job?`,
+        text: `Spend $1c to start a ${formatMmSs(
+          this.engine.config.timing.pondHarvestDurationMs,
+        )} harvest job?${summerNote}`,
         screenX: popupPoint.x,
         screenY: popupPoint.y,
         actions: [
@@ -768,15 +772,8 @@ export class GameRuntime {
           entry.ownerId === this.playerId && entry.pondX === tile.x && entry.pondY === tile.y,
       );
 
-      if (state.season.logicSeason === 'WINTER') {
-        if (pondJob?.status === 'ACTIVE') {
-          actions.push({ id: 'pond-start', label: 'Harvest In Progress', disabled: true });
-        } else if (pondJob?.status === undefined) {
-          actions.push({
-            id: 'pond-start',
-            label: `Start Harvest Job ($1c, ready in ${formatMmSs(this.engine.config.timing.pondHarvestDurationMs)})`,
-          });
-        }
+      if (pondJob?.status === 'ACTIVE') {
+        actions.push({ id: 'pond-start', label: 'Harvest In Progress', disabled: true });
       }
       const claimable = state.ponds.some(
         (entry) =>

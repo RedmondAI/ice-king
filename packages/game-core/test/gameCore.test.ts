@@ -427,6 +427,7 @@ describe('bot behavior constraints', () => {
       pondX: pond.x,
       pondY: pond.y,
       status: 'CLAIMABLE',
+      harvestIceYield: 1,
       createdAtMs: state.nowMs,
       claimAtMs: state.nowMs,
       claimedAtMs: null,

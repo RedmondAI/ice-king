@@ -393,7 +393,7 @@ export function enumerateCandidateBotActions(
     }
   }
 
-  if (state.season.logicSeason === 'WINTER' && player.money >= config.economy.pondHarvestCost) {
+  if (player.money >= config.economy.pondHarvestCost) {
     const freePonds = ownPondsWithoutJobs(state, botPlayerId, 8);
     for (const pond of freePonds) {
       addAction(

@@ -6,6 +6,10 @@ function harvestDurationMs(config: GameConfig): number {
   return Math.max(1, config.timing.pondHarvestDurationMs);
 }
 
+function harvestYield(state: GameState): number {
+  return state.season.logicSeason === 'SUMMER' ? 0.5 : 1;
+}
+
 function hasActivePondJob(state: GameState, x: number, y: number): boolean {
   return state.ponds.some(
     (job) => job.pondX === x && job.pondY === y && (job.status === 'ACTIVE' || job.status === 'CLAIMABLE'),
@@ -36,10 +40,6 @@ export function startPondHarvest(
     return { ok: false, code: 'NOT_OWNER', message: 'You must own this pond tile to harvest it.' };
   }
 
-  if (state.season.logicSeason !== 'WINTER') {
-    return { ok: false, code: 'WRONG_SEASON', message: 'Pond harvest can only start in winter.' };
-  }
-
   if (hasActivePondJob(state, x, y)) {
     return {
       ok: false,
@@ -60,6 +60,7 @@ export function startPondHarvest(
     pondX: x,
     pondY: y,
     ownerId: playerId,
+    harvestIceYield: harvestYield(state),
     status: 'ACTIVE' as const,
     createdAtMs: state.nowMs,
     claimAtMs: state.nowMs + durationMs,
@@ -124,13 +125,15 @@ export function claimPondHarvest(
 
   job.status = 'CLAIMED';
   job.claimedAtMs = state.nowMs;
-  player.ice += 1;
+  const iceGained = job.harvestIceYield;
+  player.ice += iceGained;
 
   addLog(state, 'pond.harvest.claimed', {
     playerId,
     pondJobId,
     pondX: job.pondX,
     pondY: job.pondY,
+    iceGained,
   });
 
   return {
@@ -139,7 +142,7 @@ export function claimPondHarvest(
     message: 'Pond ice claimed.',
     payload: {
       pondJobId,
-      iceAdded: 1,
+      iceAdded: iceGained,
     },
   };
 }

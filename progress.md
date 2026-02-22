@@ -19,6 +19,18 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
   - `packages/game-core/src`
   - `packages/game-core/test`
 
+## 2026-02-22 (Milestone Update 30)
+- Updated pond harvest behavior:
+  - Pond harvest can now start in any season.
+  - Summer-started harvest jobs still take the normal duration but yield only half ice on claim.
+  - The harvest action popup now warns that summer harvest yields are halved.
+- Core updates:
+  - `packages/game-core/src/systems/pondSystem.ts` for seasonal yield tracking and claim payout.
+  - `packages/shared/src/index.ts` to persist `harvestIceYield` per pond job.
+  - `apps/client/src/game/runtime.ts` for popup warning + year-round start UI path.
+  - `packages/game-core/src/systems/botSystem.ts` to allow pond-start candidates outside winter.
+  - `packages/game-core/test/gameCore.test.ts` fixture update for the new pond job field.
+
 ## Current Focus
 - Scaffold runnable workspace configs and package wiring.
 - Implement modular, deterministic game-core systems.
@@ -43,7 +55,7 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
   - map renderer + camera + minimap drag
   - ownership and hover/selection outlines
   - popup/action panels
-  - top-right collapsible stats HUD
+  - right-side rail UI containing instructions/stats/minimap outside gameplay viewport
   - debug overlay toggle (`F3`)
   - `window.render_game_to_text` + `window.advanceTime(ms)`
 - Implement theme-default art rendering per `artstyle.md`.
@@ -606,6 +618,21 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
   - `ARCHITECTURE.md`
   - `iceking.md`
 - No tests/builds executed for this UI-only edit (requested).
+
+## 2026-02-22 (Milestone Update 30)
+- Consolidated right-side overlays into a dedicated side-rail container outside the gameplay square:
+  - instructions panel
+  - stats panel
+  - minimap
+- This keeps these elements visible while reducing map coverage at all viewport sizes.
+- Implemented via:
+  - `apps/client/src/game/runtime.ts` (new side rail mount + minimap wiring)
+  - `apps/client/src/game/ui/hud.ts` (optional rail mount for stats/instructions panel)
+  - `apps/client/src/styles.css` (centralized side-rail layout styles)
+  - `iceking.md`
+  - `ARCHITECTURE.md`
+  - `GAME_SPEC.md`
+  - `progress.md`
 
 ## 2026-02-11 (Milestone Update 28)
 - Railway host-allowlist fix for Vite preview:

@@ -43,6 +43,7 @@ export class HudLayer {
   constructor(
     mount: HTMLElement,
     onPopupActionClick: (actionId: string) => void,
+    sideRailMount?: HTMLElement,
   ) {
     this.overlay = document.createElement('div');
     this.overlay.className = 'overlay-layer';
@@ -170,8 +171,13 @@ export class HudLayer {
     this.popupHost.style.inset = '0';
     this.popupHost.style.pointerEvents = 'none';
 
+    if (sideRailMount) {
+      sideRailMount.append(this.hud);
+    } else {
+      this.overlay.append(this.hud);
+    }
+
     this.overlay.append(
-      this.hud,
       this.debugToggleButton,
       this.debugOverlay,
       this.seasonBar,
