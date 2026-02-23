@@ -19,6 +19,8 @@ import {
   fetchMultiplayerRoomState,
   getMultiplayerErrorCode,
   submitMultiplayerAction,
+  submitMultiplayerChat,
+  type MultiplayerChatMessage,
   type MultiplayerSession,
 } from '../multiplayer/client';
 import iceKingLogoUrl from '../assets/ui/ice-king-logo.png';
@@ -89,6 +91,10 @@ export class GameRuntime {
   private readonly opts: RuntimeInit;
   private readonly gameLayer: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
+  private readonly chatRail: HTMLDivElement | null;
+  private readonly chatLog: HTMLDivElement | null;
+  private readonly chatInput: HTMLTextAreaElement | null;
+  private readonly chatSendButton: HTMLButtonElement | null;
   private readonly sideRail: HTMLDivElement;
   private readonly minimapFrame: HTMLDivElement;
   private readonly minimapCanvas: HTMLCanvasElement;
@@ -128,6 +134,8 @@ export class GameRuntime {
   private isMatchPausedByReconnect = false;
   private lastFrameAt = 0;
   private loopAccumulator = 0;
+  private chatSending = false;
+  private chatMessages: MultiplayerChatMessage[] = [];
 
   constructor(options: RuntimeInit) {
     this.opts = options;
@@ -192,6 +200,49 @@ export class GameRuntime {
     this.renderer = new PixelRenderer(this.canvas);
     this.renderer.resize(viewport.canvasWidth, viewport.canvasHeight);
 
+    if (this.multiplayerSession) {
+      this.chatRail = document.createElement('div');
+      this.chatRail.className = 'game-chat-rail pixel-panel';
+
+      const chatHeader = document.createElement('div');
+      chatHeader.className = 'chat-header';
+      chatHeader.textContent = 'Match Chat';
+
+      this.chatLog = document.createElement('div');
+      this.chatLog.className = 'chat-log';
+
+      const composer = document.createElement('div');
+      composer.className = 'chat-composer';
+
+      this.chatInput = document.createElement('textarea');
+      this.chatInput.className = 'chat-input';
+      this.chatInput.maxLength = 280;
+      this.chatInput.placeholder = 'Type message or emoji...';
+      this.chatInput.rows = 2;
+      this.chatInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          void this.sendChatMessage();
+        }
+      });
+
+      this.chatSendButton = document.createElement('button');
+      this.chatSendButton.className = 'pixel-button chat-send-button';
+      this.chatSendButton.type = 'button';
+      this.chatSendButton.textContent = 'Send';
+      this.chatSendButton.addEventListener('click', () => {
+        void this.sendChatMessage();
+      });
+
+      composer.append(this.chatInput, this.chatSendButton);
+      this.chatRail.append(chatHeader, this.chatLog, composer);
+    } else {
+      this.chatRail = null;
+      this.chatLog = null;
+      this.chatInput = null;
+      this.chatSendButton = null;
+    }
+
     this.sideRail = document.createElement('div');
     this.sideRail.className = 'game-side-rail';
 
@@ -218,7 +269,11 @@ export class GameRuntime {
       });
     });
 
-    this.gameLayer.append(this.canvas, this.sideRail, logoBadge);
+    if (this.chatRail) {
+      this.gameLayer.append(this.canvas, this.chatRail, this.sideRail, logoBadge);
+    } else {
+      this.gameLayer.append(this.canvas, this.sideRail, logoBadge);
+    }
 
     if (this.useExternalBot) {
       this.botDirector = new BotDirector({
@@ -301,6 +356,15 @@ export class GameRuntime {
   }
 
   private handleKeyDown = (event: KeyboardEvent): void => {
+    const target = event.target;
+    const isTypingTarget =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      (target instanceof HTMLElement && target.isContentEditable);
+    if (isTypingTarget) {
+      return;
+    }
+
     const key = event.key.toLowerCase();
     this.pressedKeys.add(key);
 
@@ -711,6 +775,8 @@ export class GameRuntime {
       if (payload.state) {
         this.applyRemoteState(payload.state);
       }
+      this.chatMessages = payload.chat;
+      this.renderChatMessages();
       this.lastMultiplayerError = null;
       this.updateHud();
       this.updateActionPanel();
@@ -748,6 +814,8 @@ export class GameRuntime {
       if (payload.state) {
         this.applyRemoteState(payload.state);
       }
+      this.chatMessages = payload.chat;
+      this.renderChatMessages();
       if (!payload.result.ok) {
         this.hud.showToast(payload.result.message);
       }
@@ -784,6 +852,81 @@ export class GameRuntime {
       winnerName: null,
       reason,
     });
+  }
+
+  private renderChatMessages(): void {
+    if (!this.chatLog) {
+      return;
+    }
+    this.chatLog.innerHTML = '';
+    for (const message of this.chatMessages) {
+      const row = document.createElement('div');
+      row.className = `chat-message ${message.playerId === this.playerId ? 'chat-message-self' : 'chat-message-other'}`;
+
+      const meta = document.createElement('div');
+      meta.className = 'chat-meta';
+      const time = new Date(message.sentAtMs);
+      const hh = time.getHours().toString().padStart(2, '0');
+      const mm = time.getMinutes().toString().padStart(2, '0');
+      meta.textContent = `${message.playerName} • ${hh}:${mm}`;
+      if (message.playerId === 'P1') {
+        meta.style.color = themePalette.ownershipBlue;
+      } else {
+        meta.style.color = themePalette.ownershipRed;
+      }
+
+      const text = document.createElement('div');
+      text.className = 'chat-text';
+      text.textContent = message.text;
+
+      row.append(meta, text);
+      this.chatLog.append(row);
+    }
+    this.chatLog.scrollTop = this.chatLog.scrollHeight;
+  }
+
+  private async sendChatMessage(): Promise<void> {
+    if (!this.multiplayerSession || !this.chatInput || !this.chatSendButton || this.chatSending) {
+      return;
+    }
+    const text = this.chatInput.value.trim();
+    if (!text) {
+      return;
+    }
+
+    this.chatSending = true;
+    this.chatInput.disabled = true;
+    this.chatSendButton.disabled = true;
+    try {
+      const payload = await submitMultiplayerChat(this.multiplayerSession, text);
+      if (payload.state) {
+        this.applyRemoteState(payload.state);
+      }
+      this.chatMessages = payload.chat;
+      this.renderChatMessages();
+      this.chatInput.value = '';
+      this.lastMultiplayerError = null;
+    } catch (error) {
+      const code = getMultiplayerErrorCode(error);
+      if (code === 'ROOM_EXPIRED' || code === 'ROOM_NOT_FOUND' || code === 'UNAUTHORIZED') {
+        const details =
+          error instanceof Error && error.message.length > 0 ? ` ${error.message}` : ' session was removed.';
+        const reason = code === 'ROOM_EXPIRED' ? `Room expired.${details}` : `Multiplayer session ended.${details}`;
+        this.hud.showToast(reason);
+        this.onMultiplayerSessionTerminated(reason);
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      this.hud.showToast(`Chat send failed: ${message}`);
+      this.lastMultiplayerError = message;
+    } finally {
+      this.chatSending = false;
+      if (this.chatInput && this.chatSendButton) {
+        this.chatInput.disabled = false;
+        this.chatSendButton.disabled = false;
+        this.chatInput.focus();
+      }
+    }
   }
 
   private dispatchAction(action: GameAction): ActionResult {
@@ -922,20 +1065,21 @@ export class GameRuntime {
     );
 
     if (tile.ownerId === this.playerId && tile.type === 'POND' && !hasPendingPondJob) {
-      const isSummer = state.season.logicSeason === 'SUMMER';
-      const summerNote = isSummer ? ' You will collect half as much ice in summer.' : '';
-      this.hud.setPondPopup({
-        text: `Spend $1c to start a ${formatMmSs(
-          this.engine.config.timing.pondHarvestDurationMs,
-        )} harvest job?${summerNote}`,
-        screenX: popupPoint.x,
-        screenY: popupPoint.y,
-        actions: [
-          { id: 'pond-confirm', label: 'Yes' },
-          { id: 'pond-cancel', label: 'No' },
-        ],
-      });
-      return;
+      if (!isSummer) {
+        this.hud.setPondPopup({
+          text: `Spend $1c to start a ${formatMmSs(
+            this.engine.config.timing.pondHarvestDurationMs,
+          )} harvest job?`,
+          screenX: popupPoint.x,
+          screenY: popupPoint.y,
+          actions: [
+            { id: 'pond-confirm', label: 'Yes' },
+            { id: 'pond-cancel', label: 'No' },
+          ],
+        });
+        return;
+      }
+      warningText = 'Pond harvest can only start in winter.';
     }
 
     if (tile.ownerId === null) {
@@ -1042,6 +1186,8 @@ export class GameRuntime {
   private updateHud(): void {
     const split = this.engine.getPlayerStorage(this.playerId);
     const state = this.engine.getState();
+    const opponentId = Object.keys(state.players).find((id) => id !== this.playerId) ?? null;
+    const opponentSplit = opponentId ? this.engine.getPlayerStorage(opponentId) : null;
     const runtimeMode = this.multiplayerSession
       ? 'MULTIPLAYER'
       : this.useExternalBot
@@ -1051,7 +1197,7 @@ export class GameRuntime {
       refrigerated: split.refrigeratedIce,
       unrefrigerated: split.unrefrigeratedIce,
       capacity: split.refrigeratedCapacity,
-    });
+    }, opponentId, opponentSplit ? { refrigerated: opponentSplit.refrigeratedIce, unrefrigerated: opponentSplit.unrefrigeratedIce, capacity: opponentSplit.refrigeratedCapacity } : { refrigerated: 0, unrefrigerated: 0, capacity: 0 });
 
     const netWorth = this.engine
       .getNetWorth()

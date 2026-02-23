@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 ## Architecture Style
 - Current architecture is modular state + systems (not ECS).
@@ -32,12 +32,13 @@ Last updated: 2026-02-22
 4. `GameRuntime` runs either:
 - local play-vs-computer engine, or
 - multiplayer-synced state via `/api/multiplayer/*` room endpoints.
-  - lobby polls `/api/multiplayer/state`, ready/start uses `ready` and `start`, and game actions post to `/api/multiplayer/action`.
+  - lobby polls `/api/multiplayer/state`, ready/start uses `ready` and `start`, gameplay actions post to `/api/multiplayer/action`, and chat posts to `/api/multiplayer/chat`.
 5. Frame loop:
 - Input handling (keys, map drag, minimap drag, two-step click tile behavior).
 - Fixed-step engine tick (local mode) or remote state sync poll (multiplayer mode).
 - External bot director update (when enabled).
 - HUD/action panel updates.
+- Multiplayer chat sync/render updates (multiplayer mode only).
 - Main canvas + minimap render.
 
 ## State and Validation Boundaries
@@ -53,7 +54,7 @@ Last updated: 2026-02-22
 - `economySystem`
 - Tile purchases/buyouts, melt logic, net worth.
 - `pondSystem`
-  - Harvest start/claim lifecycle (timed completion; starts are allowed any season, with summer starts yielding half ice output).
+  - Harvest start/claim lifecycle (timed completion; starts are winter-only, claims complete into player ice).
 - `structureSystem`
 - Build actions, house sales, train shipment, factory crafting jobs.
 - `botSystem`
@@ -70,6 +71,7 @@ Last updated: 2026-02-22
 - DOM overlay layer sits above canvas and includes a dedicated right-side control rail that contains:
   - Instructions panel (above Stats; collapsed by default).
   - Stats HUD (collapsible).
+- Multiplayer mode also mounts a dedicated left-side chat rail (full stage height) for room chat.
 - Tile action popup host (small action menu anchored above clicked tiles, shown on second click).
 - Season bar, toasts, debug overlay.
 - Tile job overlay panel (progress frame + label + remaining time + chunked progress fill) for active pond/factory jobs.
@@ -86,6 +88,7 @@ Last updated: 2026-02-22
 - Second click on same tile opens action menu.
 - Fullscreen/debug controls:
 - `F`, `Esc`, `F3`, `Q`.
+- While typing in chat/text inputs, camera/input hotkeys are ignored.
 
 ## Bot Decision Pipeline
 - Runtime asks game-core for legal candidate actions.
@@ -102,7 +105,8 @@ Last updated: 2026-02-22
 
 ## Networking Status
 - Multiplayer room API is now implemented in `apps/client/vite.config.ts` as an in-memory authoritative service.
-- Endpoints: `create`, `join`, `ready`, `start`, `state`, `action` under `/api/multiplayer/*`.
+- Endpoints: `create`, `join`, `ready`, `start`, `state`, `action`, `chat` under `/api/multiplayer/*`.
+- Chat payload is room-scoped and bounded (latest messages only) to keep room state lightweight.
 - Current limitations:
 - room state is process-memory only (no persistence, no cross-instance coordination).
 - no dedicated `apps/server` deployment target yet.

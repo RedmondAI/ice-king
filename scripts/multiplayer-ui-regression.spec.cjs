@@ -166,11 +166,21 @@ test('multiplayer flow: create, join, ready, start, action', async ({ browser })
     const guestNameInput = guest.locator('input');
     await guestNameInput.fill('Guest CI');
 
-    const joinDialog = guest.waitForEvent('dialog');
+    const joinDialogHandled = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timed out waiting for Join Game prompt.'));
+      }, 5000);
+      guest.once('dialog', (dialog) => {
+        clearTimeout(timeout);
+        if (dialog.type() !== 'prompt') {
+          reject(new Error(`Unexpected dialog type: ${dialog.type()}`));
+          return;
+        }
+        void dialog.accept(roomCode).then(resolve).catch(reject);
+      });
+    });
     await guest.getByRole('button', { name: 'Join Game' }).click();
-    const dialog = await joinDialog;
-    expect(dialog.type()).toBe('prompt');
-    await dialog.accept(roomCode);
+    await joinDialogHandled;
 
     await expect(guest.getByRole('heading', { name: 'Lobby' })).toBeVisible();
     const guestCode = await readLobbyRoomCode(guest);

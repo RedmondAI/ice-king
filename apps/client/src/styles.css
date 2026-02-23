@@ -282,6 +282,82 @@ input {
   z-index: 120;
 }
 
+.game-chat-rail {
+  position: absolute;
+  left: calc((clamp(236px, 34vw, 320px) + 14px) * -1);
+  top: 0;
+  width: clamp(236px, 34vw, 320px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  z-index: 125;
+}
+
+.chat-header {
+  font-size: 11px;
+  border-bottom: 2px solid #6b4f2a;
+  padding-bottom: 8px;
+}
+
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.chat-message {
+  border: 2px solid #5f4624;
+  background: rgba(255, 249, 234, 0.75);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  line-height: 1.35;
+}
+
+.chat-message-self {
+  background: rgba(235, 245, 255, 0.9);
+}
+
+.chat-message-other {
+  background: rgba(255, 236, 236, 0.9);
+}
+
+.chat-meta {
+  font-size: 8px;
+}
+
+.chat-text {
+  font-size: 9px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-composer {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-input {
+  border: 3px solid #6b4f2a;
+  background: #fff9ea;
+  color: #3e2723;
+  padding: 8px;
+  font-size: 10px;
+  resize: none;
+}
+
+.chat-send-button {
+  min-height: 36px;
+  padding: 8px 10px;
+  font-size: 10px;
+}
+
 #game-canvas {
   position: absolute;
   inset: 0;
@@ -509,6 +585,13 @@ input {
     width: 190px;
     height: 190px;
   }
+
+  .game-chat-rail {
+    left: 14px;
+    top: 14px;
+    height: calc(100% - 28px);
+    width: min(240px, 56vw);
+  }
 }
 
 @media (max-width: 720px) {
@@ -550,6 +633,14 @@ input {
     width: min(160px, 42vw);
     left: 10px;
     top: 10px;
+  }
+
+  .game-chat-rail {
+    left: 10px;
+    top: 10px;
+    height: calc(100% - 20px);
+    width: min(220px, 58vw);
+    padding: 8px;
   }
 
   .season-bar {

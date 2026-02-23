@@ -6,8 +6,8 @@ function harvestDurationMs(config: GameConfig): number {
   return Math.max(1, config.timing.pondHarvestDurationMs);
 }
 
-function harvestYield(state: GameState): number {
-  return state.season.logicSeason === 'SUMMER' ? 0.5 : 1;
+function harvestYield(): number {
+  return 1;
 }
 
 function hasActivePondJob(state: GameState, x: number, y: number): boolean {
@@ -48,6 +48,10 @@ export function startPondHarvest(
     };
   }
 
+  if (state.season.logicSeason !== 'WINTER') {
+    return { ok: false, code: 'WRONG_SEASON', message: 'Pond harvest can only be started in winter.' };
+  }
+
   if (player.money < config.economy.pondHarvestCost) {
     return { ok: false, code: 'INSUFFICIENT_FUNDS', message: 'Not enough money to start harvest job.' };
   }
@@ -60,7 +64,7 @@ export function startPondHarvest(
     pondX: x,
     pondY: y,
     ownerId: playerId,
-    harvestIceYield: harvestYield(state),
+    harvestIceYield: harvestYield(),
     status: 'ACTIVE' as const,
     createdAtMs: state.nowMs,
     claimAtMs: state.nowMs + durationMs,

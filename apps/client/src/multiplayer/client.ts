@@ -8,6 +8,14 @@ export interface MultiplayerSession {
   token: string;
 }
 
+export interface MultiplayerChatMessage {
+  id: string;
+  playerId: MultiplayerPlayerId;
+  playerName: string;
+  text: string;
+  sentAtMs: number;
+}
+
 export interface MultiplayerLobbyPlayerState {
   id: MultiplayerPlayerId;
   name: string;
@@ -32,6 +40,7 @@ export interface MultiplayerRoomPayload {
   serverNowMs: number;
   lobby: MultiplayerLobbyState;
   state: GameState | null;
+  chat: MultiplayerChatMessage[];
 }
 
 export interface MultiplayerCreateRequest {
@@ -62,10 +71,17 @@ export interface MultiplayerActionRequest {
   action: GameAction;
 }
 
+export interface MultiplayerChatRequest {
+  roomCode: string;
+  token: string;
+  text: string;
+}
+
 export interface MultiplayerResponse<TData = unknown> {
   serverNowMs: number;
   lobby: MultiplayerLobbyState;
   state: GameState | null;
+  chat: MultiplayerChatMessage[];
   result?: ActionResult;
   data?: TData;
 }
@@ -75,6 +91,7 @@ export interface MultiplayerCreateResponse {
   serverNowMs: number;
   lobby: MultiplayerLobbyState;
   state: GameState | null;
+  chat: MultiplayerChatMessage[];
 }
 
 export interface MultiplayerJoinResponse {
@@ -82,19 +99,30 @@ export interface MultiplayerJoinResponse {
   serverNowMs: number;
   lobby: MultiplayerLobbyState;
   state: GameState | null;
+  chat: MultiplayerChatMessage[];
 }
 
 export interface MultiplayerReadyResponse {
   serverNowMs: number;
   lobby: MultiplayerLobbyState;
   state: GameState | null;
+  chat: MultiplayerChatMessage[];
 }
 
 export interface MultiplayerActionResponse {
   serverNowMs: number;
   lobby: MultiplayerLobbyState;
   state: GameState | null;
+  chat: MultiplayerChatMessage[];
   result: ActionResult;
+}
+
+export interface MultiplayerChatResponse {
+  serverNowMs: number;
+  lobby: MultiplayerLobbyState;
+  state: GameState | null;
+  chat: MultiplayerChatMessage[];
+  message: MultiplayerChatMessage;
 }
 
 interface ErrorPayload {
@@ -253,5 +281,16 @@ export async function submitMultiplayerAction(
     roomCode: normalizeRoomCode(session.roomCode),
     token: session.token,
     action,
+  });
+}
+
+export async function submitMultiplayerChat(
+  session: MultiplayerSession,
+  text: string,
+): Promise<MultiplayerChatResponse> {
+  return postJson<MultiplayerChatResponse>('/chat', {
+    roomCode: normalizeRoomCode(session.roomCode),
+    token: session.token,
+    text,
   });
 }

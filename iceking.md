@@ -1,6 +1,6 @@
 # Ice King Master Spec (Current Branch)
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 This document is the implementation-aligned spec for the current client-first branch.
 If this file conflicts with code, update this file in the same change set.
@@ -9,6 +9,7 @@ If this file conflicts with code, update this file in the same change set.
 - Primary playable mode is `Play vs Computer`.
 - `Create Game` and `Join Game` use the `/api/multiplayer/*` room flow via authoritative in-process room middleware.
 - Multiplayer authority is currently in-memory in the Vite host process (no persistent dedicated server yet).
+- Multiplayer room middleware currently supports `create`, `join`, `ready`, `start`, `state`, `action`, and `chat`.
 - Reconnect and room-expiry UX are now implemented:
   - Player sessions are token-bound (`P1`/`P2` with persistent room tokens).
   - Active matches pause when a player disconnects and resume messaging is shown while waiting for reconnect.
@@ -21,7 +22,6 @@ If this file conflicts with code, update this file in the same change set.
 2. Main viewport renders `5 x 5` tiles.
 3. Internal render uses `256 x 256` tile assets per tile (`1280 x 1280` canvas for the `5 x 5` viewport).
 4. Main map is shown in a centered square stage that scales uniformly to fit the browser window (max `1280 x 1280`, letterboxing allowed).
-5. Minimap is always visible in bottom-right and supports drag-to-pan/click-to-pan.
 5. Minimap is always visible in a right-side rail (outside main game area), and supports drag-to-pan/click-to-pan.
 5.1 Minimap renders playable tiles only (the `VOID` border ring is hidden there), so the red camera rectangle can extend off-minimap near far map edges.
 6. Tile interactions:
@@ -31,13 +31,15 @@ If this file conflicts with code, update this file in the same change set.
 - Drag release suppresses accidental click-open.
 7. Tile action menu appears as a popup anchored above the selected tile and is shown on the second click.
 8. Stats panel is placed in the right-side rail (outside map area), collapsible, and layered above map/overlays.
-8.1 Instructions panel is above Stats in that same rail, collapsed by default, and explains core rules.
+8.1 A second stats section, `Other User's Stats`, appears under player stats and uses the opponent color as its border.
+8.2 Instructions panel is above Stats in that same rail, collapsed by default, and explains core rules.
+8.3 Multiplayer mode adds a dedicated left-side chat rail that fills stage height and supports emoji text chat.
 9. Splash screen appears at root (`/`) every visit and includes first menu actions.
 10. Seasons use 9 keyframes for visual transition while gameplay logic flips at season boundary.
 
 ## Core Gameplay Loop
 1. Buy territory.
-2. Own and operate ponds in any season (summer harvest starts yield half ice).
+2. Own and operate ponds during winter.
 3. Harvest and collect ice when ready (default `1:00`).
 4. Avoid summer melt with refrigerators.
 5. Build factories and man-made ponds on owned `GRASS`/`FOREST` tiles.
@@ -51,7 +53,7 @@ If this file conflicts with code, update this file in the same change set.
 - Buyout owned tile: `currentPrice + $1` fee.
 - Build factory: `2 ice + $2`.
 - Build man-made pond: `1 ice + $2`.
-- Start pond harvest: `$1` (summer starts yield half ice).
+- Start pond harvest: `$1` (winter only).
 - Sell at house (Summer only):
 - Ice: `$2` each.
 - Blue ice: `$8` each.
@@ -128,6 +130,7 @@ If this file conflicts with code, update this file in the same change set.
 ## Validation Baseline
 - `npm run test`
 - `npm run build`
+- `npm run test:multiplayer:ui`
 - Playwright flow: splash -> lobby -> match -> camera/action interactions -> no console errors
 - Keep `window.render_game_to_text()` and `window.advanceTime(ms)` operational.
 - `npm run test` now includes multiplayer API regression (`create -> join -> ready -> start -> action -> reconnect -> expiry`).

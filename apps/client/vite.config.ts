@@ -102,6 +102,14 @@ interface MultiplayerRoomPlayer {
   lastSeenMs: number;
 }
 
+interface MultiplayerChatMessage {
+  id: string;
+  playerId: MultiplayerPlayerId;
+  playerName: string;
+  text: string;
+  sentAtMs: number;
+}
+
 interface MultiplayerLobbySnapshot {
   roomCode: string;
   started: boolean;
@@ -131,6 +139,7 @@ interface MultiplayerRoom {
     P1: MultiplayerRoomPlayer;
     P2: MultiplayerRoomPlayer | null;
   };
+  chat: MultiplayerChatMessage[];
 }
 
 function extractOutputText(result: ResponsesApiResult): string {
@@ -337,6 +346,17 @@ function playerToken(): string {
 function sanitizePlayerName(raw: unknown, fallback: string): string {
   const value = typeof raw === 'string' ? raw.trim().slice(0, 24) : '';
   return value.length > 0 ? value : fallback;
+}
+
+function sanitizeChatText(raw: unknown): string {
+  if (typeof raw !== 'string') {
+    return '';
+  }
+  return raw
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
+    .slice(0, 280);
 }
 
 function syncRoomPresence(room: MultiplayerRoom): void {
@@ -561,12 +581,14 @@ function multiplayerRoomPayload(room: MultiplayerRoom, nowMs: number): {
   serverNowMs: number;
   lobby: MultiplayerLobbySnapshot;
   state: GameState | null;
+  chat: MultiplayerChatMessage[];
 } {
   tickRoom(room, nowMs);
   return {
     serverNowMs: nowMs,
     lobby: toLobbySnapshot(room),
     state: room.started ? room.engine.getState() : null,
+    chat: room.chat,
   };
 }
 
@@ -673,6 +695,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
             P1: hostPlayer,
             P2: null,
           },
+          chat: [],
         };
         syncRoomPresence(room);
         rooms.set(roomCode, room);
@@ -763,6 +786,53 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
         room.updatedAtMs = nowMs;
         syncRoomPresence(room);
         jsonResponse(res, 200, multiplayerRoomPayload(room, nowMs));
+        return;
+      }
+
+      if (path === '/chat' && method === 'POST') {
+        const body = JSON.parse(await readBody(req, maxBodyBytes)) as Record<string, unknown>;
+        const roomCode = normalizeRoomCode(String(body.roomCode ?? ''));
+        const { room, expired, details } = getRoomIfFresh(rooms, roomCode, nowMs, roomTtlMs);
+        if (!room) {
+          jsonResponse(res, 404, {
+            error: expired ? 'ROOM_EXPIRED' : 'ROOM_NOT_FOUND',
+            ...(details ? { details } : {}),
+          });
+          return;
+        }
+
+        const player = findPlayerByToken(room, String(body.token ?? ''));
+        if (!player) {
+          jsonResponse(res, 401, { error: 'UNAUTHORIZED' });
+          return;
+        }
+
+        const text = sanitizeChatText(body.text);
+        if (!text) {
+          jsonResponse(res, 400, { error: 'INVALID_CHAT_MESSAGE', details: 'Chat message cannot be empty.' });
+          return;
+        }
+
+        markPlayerHeartbeat(room, player, nowMs);
+        refreshDisconnectedState(room, nowMs);
+
+        const message: MultiplayerChatMessage = {
+          id: `${nowMs.toString(36)}_${randomBytes(6).toString('hex')}`,
+          playerId: player.id,
+          playerName: player.name,
+          text,
+          sentAtMs: nowMs,
+        };
+        room.chat.push(message);
+        if (room.chat.length > 100) {
+          room.chat.splice(0, room.chat.length - 100);
+        }
+        room.updatedAtMs = nowMs;
+        syncRoomPresence(room);
+        jsonResponse(res, 200, {
+          ...multiplayerRoomPayload(room, nowMs),
+          message,
+        });
         return;
       }
 
@@ -896,7 +966,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
         return;
       }
 
-      if (['/create', '/join', '/ready', '/start', '/state', '/action'].includes(path)) {
+      if (['/create', '/join', '/ready', '/start', '/state', '/action', '/chat'].includes(path)) {
         jsonResponse(res, 405, { error: 'METHOD_NOT_ALLOWED' });
         return;
       }

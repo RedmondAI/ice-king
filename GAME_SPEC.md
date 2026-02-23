@@ -1,6 +1,6 @@
 # GAME_SPEC
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 ## Current Playable Mode
 - Supported modes:
@@ -16,6 +16,7 @@ Last updated: 2026-02-22
   - `POST /api/multiplayer/start` is host-gated (`P1` only), requires both players ready.
   - `GET /api/multiplayer/state` polls lobby and state.
   - `POST /api/multiplayer/action` applies validated gameplay actions.
+  - `POST /api/multiplayer/chat` appends a room chat message and returns updated room payload.
 - Session semantics:
   - sessions are token-based (`session.token` + `roomCode` + player id), passed on each multiplayer call;
   - host is fixed to `P1`;
@@ -31,7 +32,7 @@ Last updated: 2026-02-22
 
 ## Core Loop
 - Expand by buying tiles.
-- Control ponds and start harvest jobs in any season (summer starts yield half ice).
+- Control ponds and start harvest jobs in winter.
 - Claim harvest output when ready (default `1:00`).
 - Protect regular ice with refrigerators.
 - Build factories and man-made ponds on owned `GRASS`/`FOREST`.
@@ -45,7 +46,7 @@ Last updated: 2026-02-22
 - Buyout tile: `tile.currentPrice + $1` fee.
 - Build factory: `2 ice + $2`.
 - Build man-made pond: `1 ice + $2`.
-- Pond harvest start: `$1` (summer start yields half ice).
+- Pond harvest start: `$1` (winter only).
 - House sell (Summer only):
 - Ice: `$2` each.
 - Blue ice: `$8` each.
@@ -121,6 +122,10 @@ Last updated: 2026-02-22
 - Stats panel:
 - In a right-side rail outside the game area, collapsible, above map layer.
 - Shows money, ice, blue ice, refrigerators, refrigerated split, season, and train window status.
+- Includes `Other User's Stats` beneath the local player stats, with border color based on opponent color.
+- Multiplayer chat panel:
+- In multiplayer matches only, a full-height chat window appears on the left side of the map.
+- Supports standard text chat and emoji entry, with Enter-to-send and Shift+Enter for newline.
 - Tile action menu:
 - Hidden by default.
 - Appears as a small popup above the selected tile after the second click on the same tile (two-step selection).

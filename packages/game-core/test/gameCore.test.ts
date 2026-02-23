@@ -272,6 +272,30 @@ describe('season and pond systems', () => {
     expect(state.players.P1.ice).toBe(1);
   });
 
+  test('pond harvest can only be started in winter', () => {
+    const engine = createHeadToHeadEngine({ startingSeason: 'SUMMER' });
+    const state = engine.getState();
+
+    const pondTile = firstTileBy(engine, (entry) => entry.type === 'POND');
+    const pondRef = state.tiles.find((entry) => entry.x === pondTile.x && entry.y === pondTile.y);
+    if (!pondRef) {
+      throw new Error('Pond tile missing.');
+    }
+
+    pondRef.ownerId = 'P1';
+    state.players.P1.money = 5;
+
+    const startResult = engine.applyAction({
+      type: 'pond.harvest.start',
+      playerId: 'P1',
+      ...pondTile,
+    });
+
+    expect(startResult.ok).toBe(false);
+    expect(startResult.code).toBe('WRONG_SEASON');
+    expect(state.ponds).toHaveLength(0);
+  });
+
   test('pond harvest and house sale update player stats end-to-end', () => {
     const engine = createHeadToHeadEngine({ startingSeason: 'WINTER' });
     const state = engine.getState();
@@ -396,7 +420,7 @@ describe('bot behavior constraints', () => {
     expect(botOwnedTiles).toBeGreaterThan(0);
   });
 
-  test('bot candidate action list is rich, deduplicated, and bound to bot player', () => {
+  test('bot candidate action list is rich, deduplicated, and season-aware', () => {
     const engine = GameEngine.createPlayVsComputer('bot-candidates', 'Human', 'DEV_FAST', 'EXTERNAL');
     const state = engine.getState();
 
@@ -439,21 +463,29 @@ describe('bot behavior constraints', () => {
       claimedAtMs: null,
     });
 
-    const actions = engine.listBotCandidateActions('P2', 40);
-    expect(actions.length).toBeGreaterThan(6);
-    expect(actions.length).toBeLessThanOrEqual(40);
+    const summerActions = engine.listBotCandidateActions('P2', 40);
+    expect(summerActions.length).toBeGreaterThan(6);
+    expect(summerActions.length).toBeLessThanOrEqual(40);
 
-    const serialized = actions.map((action) => JSON.stringify(action));
-    expect(new Set(serialized).size).toBe(actions.length);
-    expect(actions.every((action) => action.playerId === 'P2')).toBe(true);
+    const summerSerialized = summerActions.map((action) => JSON.stringify(action));
+    expect(new Set(summerSerialized).size).toBe(summerActions.length);
+    expect(summerActions.every((action) => action.playerId === 'P2')).toBe(true);
 
-    const actionTypes = new Set(actions.map((action) => action.type));
-    expect(actionTypes.has('pond.harvest.claim')).toBe(true);
-    expect(actionTypes.has('pond.harvest.start')).toBe(true);
-    expect(actionTypes.has('structure.house.sellIce')).toBe(true);
-    expect(actionTypes.has('structure.factory.craftBlueIce')).toBe(true);
-    expect(actionTypes.has('structure.train.sellAnnualShipment')).toBe(true);
-    expect(actionTypes.has('tile.buy')).toBe(true);
+    const summerTypes = new Set(summerActions.map((action) => action.type));
+    expect(summerTypes.has('pond.harvest.claim')).toBe(true);
+    expect(summerTypes.has('structure.house.sellIce')).toBe(true);
+    expect(summerTypes.has('structure.factory.craftBlueIce')).toBe(true);
+    expect(summerTypes.has('structure.train.sellAnnualShipment')).toBe(true);
+    expect(summerTypes.has('tile.buy')).toBe(true);
+    expect(summerTypes.has('pond.harvest.start')).toBe(false);
+
+    state.season.logicSeason = 'WINTER';
+    state.season.visualFromSeason = 'WINTER';
+    state.season.visualToSeason = 'SUMMER';
+
+    const winterActions = engine.listBotCandidateActions('P2', 40);
+    const winterTypes = new Set(winterActions.map((action) => action.type));
+    expect(winterTypes.has('pond.harvest.start')).toBe(true);
   });
 
   test('heuristic prioritizes high-value expansion targets early', () => {

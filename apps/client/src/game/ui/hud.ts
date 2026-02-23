@@ -33,13 +33,18 @@ export class HudLayer {
   private readonly seasonBar: HTMLDivElement;
   private readonly toastStack: HTMLDivElement;
   private readonly popupHost: HTMLDivElement;
+  private readonly opponentHead: HTMLDivElement;
 
   private readonly statRows: Record<string, HTMLSpanElement>;
+  private readonly opponentStatRows: Record<string, HTMLSpanElement>;
   private collapsed = false;
+  private opponentCollapsed = false;
   private instructionsCollapsed = true;
   private debugEnabled = false;
   private toasts: ToastItem[] = [];
   private lastPopupSignature: string | null = null;
+  private readonly opponentHudBody: HTMLDivElement;
+  private readonly opponentHudToggle: HTMLButtonElement;
 
   constructor(
     mount: HTMLElement,
@@ -145,8 +150,45 @@ export class HudLayer {
       }),
     ) as Record<string, HTMLSpanElement>;
 
+    this.opponentHead = document.createElement('div');
+    this.opponentHead.className = 'hud-head pixel-panel';
+    this.opponentHead.style.padding = '8px';
+
+    const opponentTitle = document.createElement('h2');
+    opponentTitle.className = 'hud-title';
+    opponentTitle.textContent = "Other User's Stats";
+
+    this.opponentHudToggle = document.createElement('button');
+    this.opponentHudToggle.className = 'hud-toggle';
+    this.opponentHudToggle.textContent = '▲';
+    this.opponentHudToggle.addEventListener('click', () => {
+      this.opponentCollapsed = !this.opponentCollapsed;
+      this.opponentHudBody.style.display = this.opponentCollapsed ? 'none' : 'grid';
+      this.opponentHudToggle.textContent = this.opponentCollapsed ? '▼' : '▲';
+    });
+
+    this.opponentHead.append(opponentTitle, this.opponentHudToggle);
+
+    this.opponentHudBody = document.createElement('div');
+    this.opponentHudBody.className = 'hud-body pixel-panel';
+    this.opponentHudBody.style.borderColor = 'var(--ui-border)';
+
+    this.opponentStatRows = Object.fromEntries(
+      labels.map((label) => {
+        const row = document.createElement('div');
+        row.className = 'hud-row';
+        const key = document.createElement('span');
+        key.textContent = label;
+        const value = document.createElement('span');
+        value.textContent = '-';
+        row.append(key, value);
+        this.opponentHudBody.append(row);
+        return [label, value];
+      }),
+    ) as Record<string, HTMLSpanElement>;
+
     this.instructions.append(instructionsHead, this.instructionsBody);
-    this.hud.append(this.instructions, hudHead, this.hudBody);
+    this.hud.append(this.instructions, hudHead, this.hudBody, this.opponentHead, this.opponentHudBody);
 
     this.debugToggleButton = document.createElement('button');
     this.debugToggleButton.className = 'pixel-button debug-toggle';
@@ -207,24 +249,61 @@ export class HudLayer {
     this.debugOverlay.style.display = visible ? 'block' : 'none';
   }
 
-  updateStats(state: GameState, playerId: string, extra: { refrigerated: number; unrefrigerated: number; capacity: number }): void {
-    const player = state.players[playerId];
-    if (!player) {
-      return;
+  updateStats(
+    state: GameState,
+    playerId: string,
+    extra: { refrigerated: number; unrefrigerated: number; capacity: number },
+    opponentId: string | null,
+    opponentExtra: { refrigerated: number; unrefrigerated: number; capacity: number },
+  ): void {
+    const player = state.players[playerId] ?? null;
+    const opponent = opponentId ? state.players[opponentId] ?? null : null;
+
+    const setRows = (rows: Record<string, HTMLSpanElement>, targetPlayer: GameState['players'][string] | null, storage: {
+      refrigerated: number;
+      unrefrigerated: number;
+      capacity: number;
+    }) => {
+      if (!targetPlayer) {
+        rows.money.textContent = '-';
+        rows.ice.textContent = '-';
+        rows.blueIce.textContent = '-';
+        rows.refrigerators.textContent = '-';
+        rows.refrigerated.textContent = '-';
+        rows.unrefrigerated.textContent = '-';
+        rows.unrefrigerated.className = '';
+        rows.season.textContent = '-';
+        rows.trainWindow.textContent = '-';
+        return;
+      }
+
+      rows.money.textContent = `$${targetPlayer.money}c`;
+      rows.ice.textContent = `${targetPlayer.ice}`;
+      rows.blueIce.textContent = `${targetPlayer.blueIce}`;
+      rows.refrigerators.textContent = `${targetPlayer.refrigerators}`;
+      rows.refrigerated.textContent = `${storage.refrigerated}/${storage.capacity}`;
+      rows.unrefrigerated.textContent = `${storage.unrefrigerated}`;
+      rows.unrefrigerated.className = storage.unrefrigerated > 0 ? 'warning' : '';
+      rows.season.textContent = `${state.season.logicSeason} kf:${state.season.transitionKeyframeIndex}`;
+
+      const year = state.trainSales.currentYear;
+      const used = state.trainSales.usedByPlayerId[targetPlayer.id] === year;
+      rows.trainWindow.textContent = used ? `Year ${year}: Used` : `Year ${year}: Ready`;
+    };
+
+    setRows(this.statRows, player, extra);
+    setRows(this.opponentStatRows, opponent, opponentExtra);
+
+    if (opponent?.color === 'RED') {
+      this.opponentHead.style.borderColor = 'var(--red)';
+      this.opponentHudBody.style.borderColor = 'var(--red)';
+    } else if (opponent?.color === 'BLUE') {
+      this.opponentHead.style.borderColor = 'var(--blue)';
+      this.opponentHudBody.style.borderColor = 'var(--blue)';
+    } else {
+      this.opponentHead.style.borderColor = 'var(--ui-border)';
+      this.opponentHudBody.style.borderColor = 'var(--ui-border)';
     }
-
-    this.statRows.money.textContent = `$${player.money}c`;
-    this.statRows.ice.textContent = `${player.ice}`;
-    this.statRows.blueIce.textContent = `${player.blueIce}`;
-    this.statRows.refrigerators.textContent = `${player.refrigerators}`;
-    this.statRows.refrigerated.textContent = `${extra.refrigerated}/${extra.capacity}`;
-    this.statRows.unrefrigerated.textContent = `${extra.unrefrigerated}`;
-    this.statRows.unrefrigerated.className = extra.unrefrigerated > 0 ? 'warning' : '';
-    this.statRows.season.textContent = `${state.season.logicSeason} kf:${state.season.transitionKeyframeIndex}`;
-
-    const year = state.trainSales.currentYear;
-    const used = state.trainSales.usedByPlayerId[playerId] === year;
-    this.statRows.trainWindow.textContent = used ? `Year ${year}: Used` : `Year ${year}: Ready`;
 
     const cycleElapsed = state.nowMs - state.season.cycleStartMs;
     const cycleRemaining = Math.max(0, state.season.cycleDurationMs - cycleElapsed);

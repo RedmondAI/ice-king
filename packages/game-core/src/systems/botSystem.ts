@@ -324,7 +324,10 @@ function scoreBotAction(
     case 'pond.harvest.claim':
       return 160;
     case 'pond.harvest.start':
-      return state.season.logicSeason === 'WINTER' ? 128 : 40;
+      if (state.season.logicSeason !== 'WINTER') {
+        return 0;
+      }
+      return 128;
     case 'structure.train.sellAnnualShipment':
       return 112 + Math.max(0, 8 - player.money);
     case 'tile.buy':
@@ -399,7 +402,7 @@ export function enumerateCandidateBotActions(
     }
   }
 
-  if (player.money >= config.economy.pondHarvestCost) {
+  if (state.season.logicSeason === 'WINTER' && player.money >= config.economy.pondHarvestCost) {
     const freePonds = ownPondsWithoutJobs(state, botPlayerId, 8);
     for (const pond of freePonds) {
       addAction(

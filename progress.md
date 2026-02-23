@@ -2,6 +2,41 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-23 (Milestone Update 34)
+- Fixed remaining game-core test failure and completed documentation sync:
+  - Updated `packages/game-core/test/gameCore.test.ts` bot candidate coverage to be season-aware.
+  - Summer assertions now validate sell/craft/train/claim candidate presence.
+  - Winter assertions now validate `pond.harvest.start` candidate presence.
+  - Synced `iceking.md`, `GAME_SPEC.md`, and `ARCHITECTURE.md` with current winter-only pond harvest behavior and latest multiplayer UI/network behavior.
+  - Updated `artstyle.md` timestamp + sprint note (no art contract changes).
+- Validation:
+  - `npm run test -w @ice-king/game-core` -> pass (`15/15`)
+  - `npm run test` -> pass
+  - `npm run test:multiplayer:ui` -> pass (`1 passed`)
+
+## 2026-02-22 (Milestone Update 33)
+- Added multiplayer in-match chat with emoji-capable input and full-height left rail UI:
+  - New in-memory room chat endpoint: `POST /api/multiplayer/chat`.
+  - Multiplayer room payloads now include a `chat` message list.
+  - Runtime now renders a multiplayer-only chat panel on the left side of the map and syncs chat via state/action/chat responses.
+  - Chat composer supports Enter to send and Shift+Enter for newline.
+  - Hardened Playwright UI regression script prompt handling for `Join Game` to avoid dialog click deadlock in headless runs.
+- Files updated:
+  - `apps/client/vite.config.ts`
+  - `apps/client/src/multiplayer/client.ts`
+  - `apps/client/src/game/runtime.ts`
+  - `apps/client/src/styles.css`
+  - `scripts/multiplayer-ui-regression.spec.cjs`
+  - `GAME_SPEC.md`
+  - `ARCHITECTURE.md`
+  - `progress.md`
+- Validation:
+  - `npm install --save-dev @playwright/test` -> pass
+  - `npm run build` -> pass
+  - `npm run test:multiplayer` -> pass
+  - `npm run test` -> fails in existing `packages/game-core/test/gameCore.test.ts` (`pond.harvest.start` candidate assertion).
+  - `npm run test:multiplayer:ui` -> pass (`1 passed`)
+
 ## 2026-02-22 (Milestone Update 32)
 - Completed multiplayer flow hardening and automated regression coverage:
   - `scripts/multiplayer-regression.mjs` now validates `create -> join -> ready -> start -> action -> reconnect -> expiry`.
