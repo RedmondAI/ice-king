@@ -56,6 +56,25 @@ interface BotTokenStats {
   lastOutputTokens: number;
 }
 
+const CHAT_PICKER_EMOJIS = [
+  '😀',
+  '😂',
+  '😍',
+  '🤔',
+  '😎',
+  '🥶',
+  '🔥',
+  '💰',
+  '🧊',
+  '👑',
+  '👍',
+  '🎉',
+  '😢',
+  '😡',
+  '🙌',
+  '🚂',
+];
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -95,6 +114,8 @@ export class GameRuntime {
   private readonly chatLog: HTMLDivElement | null;
   private readonly chatInput: HTMLTextAreaElement | null;
   private readonly chatSendButton: HTMLButtonElement | null;
+  private readonly chatEmojiButton: HTMLButtonElement | null;
+  private readonly chatEmojiPopup: HTMLDivElement | null;
   private readonly sideRail: HTMLDivElement;
   private readonly minimapFrame: HTMLDivElement;
   private readonly minimapCanvas: HTMLCanvasElement;
@@ -135,6 +156,7 @@ export class GameRuntime {
   private lastFrameAt = 0;
   private loopAccumulator = 0;
   private chatSending = false;
+  private chatEmojiOpen = false;
   private chatMessages: MultiplayerChatMessage[] = [];
 
   constructor(options: RuntimeInit) {
@@ -214,6 +236,22 @@ export class GameRuntime {
       const composer = document.createElement('div');
       composer.className = 'chat-composer';
 
+      this.chatEmojiPopup = document.createElement('div');
+      this.chatEmojiPopup.className = 'chat-emoji-popover pixel-panel';
+      this.chatEmojiPopup.style.display = 'none';
+
+      for (const emoji of CHAT_PICKER_EMOJIS) {
+        const emojiButton = document.createElement('button');
+        emojiButton.className = 'chat-emoji-option';
+        emojiButton.type = 'button';
+        emojiButton.textContent = emoji;
+        emojiButton.title = emoji;
+        emojiButton.addEventListener('click', () => {
+          this.insertChatEmoji(emoji);
+        });
+        this.chatEmojiPopup.append(emojiButton);
+      }
+
       this.chatInput = document.createElement('textarea');
       this.chatInput.className = 'chat-input';
       this.chatInput.maxLength = 280;
@@ -234,13 +272,27 @@ export class GameRuntime {
         void this.sendChatMessage();
       });
 
-      composer.append(this.chatInput, this.chatSendButton);
+      this.chatEmojiButton = document.createElement('button');
+      this.chatEmojiButton.className = 'pixel-button chat-emoji-button';
+      this.chatEmojiButton.type = 'button';
+      this.chatEmojiButton.textContent = 'Emoji';
+      this.chatEmojiButton.addEventListener('click', () => {
+        this.toggleChatEmojiPicker();
+      });
+
+      const composerActions = document.createElement('div');
+      composerActions.className = 'chat-composer-actions';
+      composerActions.append(this.chatEmojiButton, this.chatSendButton);
+
+      composer.append(this.chatEmojiPopup, this.chatInput, composerActions);
       this.chatRail.append(chatHeader, this.chatLog, composer);
     } else {
       this.chatRail = null;
       this.chatLog = null;
       this.chatInput = null;
       this.chatSendButton = null;
+      this.chatEmojiButton = null;
+      this.chatEmojiPopup = null;
     }
 
     this.sideRail = document.createElement('div');
@@ -885,6 +937,39 @@ export class GameRuntime {
     this.chatLog.scrollTop = this.chatLog.scrollHeight;
   }
 
+  private toggleChatEmojiPicker(): void {
+    if (!this.chatEmojiPopup || !this.chatEmojiButton) {
+      return;
+    }
+    this.chatEmojiOpen = !this.chatEmojiOpen;
+    this.chatEmojiPopup.style.display = this.chatEmojiOpen ? 'grid' : 'none';
+    this.chatEmojiButton.textContent = this.chatEmojiOpen ? 'Close' : 'Emoji';
+  }
+
+  private closeChatEmojiPicker(): void {
+    if (!this.chatEmojiPopup || !this.chatEmojiButton) {
+      return;
+    }
+    this.chatEmojiOpen = false;
+    this.chatEmojiPopup.style.display = 'none';
+    this.chatEmojiButton.textContent = 'Emoji';
+  }
+
+  private insertChatEmoji(emoji: string): void {
+    if (!this.chatInput) {
+      return;
+    }
+
+    const start = this.chatInput.selectionStart ?? this.chatInput.value.length;
+    const end = this.chatInput.selectionEnd ?? start;
+    const current = this.chatInput.value;
+    this.chatInput.value = `${current.slice(0, start)}${emoji}${current.slice(end)}`;
+    const cursor = start + emoji.length;
+    this.chatInput.focus();
+    this.chatInput.setSelectionRange(cursor, cursor);
+    this.closeChatEmojiPicker();
+  }
+
   private async sendChatMessage(): Promise<void> {
     if (!this.multiplayerSession || !this.chatInput || !this.chatSendButton || this.chatSending) {
       return;
@@ -905,6 +990,7 @@ export class GameRuntime {
       this.chatMessages = payload.chat;
       this.renderChatMessages();
       this.chatInput.value = '';
+      this.closeChatEmojiPicker();
       this.lastMultiplayerError = null;
     } catch (error) {
       const code = getMultiplayerErrorCode(error);

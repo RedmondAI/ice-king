@@ -341,6 +341,43 @@ input {
 .chat-composer {
   display: grid;
   gap: 8px;
+  position: relative;
+}
+
+.chat-composer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-emoji-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  z-index: 20;
+}
+
+.chat-emoji-option {
+  border: 2px solid #5f4624;
+  background: #fff9ea;
+  color: #3e2723;
+  min-height: 32px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.chat-emoji-option:hover {
+  transform: translateY(-1px);
+}
+
+.chat-emoji-button,
+.chat-send-button {
+  flex: 1;
 }
 
 .chat-input {
