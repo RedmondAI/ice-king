@@ -60,7 +60,7 @@ Last updated: 2026-02-23
 - `botSystem`
 - Candidate action generation, ranking, heuristic choice, cadence handling.
 - `winConditionSystem`
-- Match end, overtime, forfeit/time winner logic.
+- Match end, overtime, forfeit/time winner logic (time winner is highest money, not net worth).
 
 ## Rendering and Layering
 - Main map: single `canvas` (`#game-canvas`) filling a centered square stage that scales uniformly to fit the browser window (max `1280 x 1280`).
@@ -72,6 +72,7 @@ Last updated: 2026-02-23
   - Instructions panel (above Stats; collapsed by default).
   - Stats HUD (collapsible).
 - Multiplayer mode also mounts a dedicated left-side chat rail (full stage height) for room chat.
+- Chat composer includes an emoji-picker popup for quick emoji insertion.
 - Tile action popup host (small action menu anchored above clicked tiles, shown on second click).
 - Season bar, toasts, debug overlay.
 - Tile job overlay panel (progress frame + label + remaining time + chunked progress fill) for active pond/factory jobs.

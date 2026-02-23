@@ -2,6 +2,43 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-23 (Milestone Update 36)
+- Added multiplayer chat emoji-picker popup UI:
+  - chat composer now has an `Emoji` button.
+  - button opens a popup picker with quick-select emojis.
+  - selected emoji inserts at cursor in chat input, then user sends normally.
+- Synced core docs for latest behavior:
+  - winner is highest money at end of match (not net worth).
+  - multiplayer chat now explicitly documents emoji-picker popup behavior.
+- Files updated:
+  - `apps/client/src/game/runtime.ts`
+  - `apps/client/src/styles.css`
+  - `packages/game-core/src/systems/winConditionSystem.ts`
+  - `packages/game-core/test/gameCore.test.ts`
+  - `apps/client/src/game/ui/hud.ts`
+  - `iceking.md`
+  - `ARCHITECTURE.md`
+  - `artstyle.md`
+  - `GAME_SPEC.md`
+  - `progress.md`
+
+## 2026-02-23 (Milestone Update 35)
+- Updated end-of-match winner logic to money-only:
+  - time winner now resolves by highest `player.money` only.
+  - if money is tied, overtime/draw behavior is preserved based on existing config.
+  - removed net-worth-based winner resolution path.
+- Added/updated tests for match outcome behavior:
+  - winner by higher money even when opponent has higher assets.
+  - equal-money draw when overtime is disabled.
+- Updated player-facing/docs wording from net worth to money-based win condition.
+- Files updated:
+  - `packages/game-core/src/systems/winConditionSystem.ts`
+  - `packages/game-core/test/gameCore.test.ts`
+  - `apps/client/src/game/ui/hud.ts`
+  - `iceking.md`
+  - `GAME_SPEC.md`
+  - `progress.md`
+
 ## 2026-02-23 (Milestone Update 34)
 - Fixed remaining game-core test failure and completed documentation sync:
   - Updated `packages/game-core/test/gameCore.test.ts` bot candidate coverage to be season-aware.

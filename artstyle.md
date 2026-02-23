@@ -7,7 +7,7 @@ Last updated: 2026-02-23
   - 256x256 tile assets,
   - 768x768 3x3 transition sheets,
   - no frame/border gutters and strict tile-edge continuity.
-- Multiplayer chat rail and dual stats UI are DOM layout updates only and do not change tile/sprite asset requirements.
+- Multiplayer chat rail, emoji-picker popup, dual stats UI, and money-only winner logic are gameplay/DOM updates only and do not change tile/sprite asset requirements.
 
 ## Core Direction
 - Top-down pixel-art strategy style.

@@ -33,7 +33,7 @@ If this file conflicts with code, update this file in the same change set.
 8. Stats panel is placed in the right-side rail (outside map area), collapsible, and layered above map/overlays.
 8.1 A second stats section, `Other User's Stats`, appears under player stats and uses the opponent color as its border.
 8.2 Instructions panel is above Stats in that same rail, collapsed by default, and explains core rules.
-8.3 Multiplayer mode adds a dedicated left-side chat rail that fills stage height and supports emoji text chat.
+8.3 Multiplayer mode adds a dedicated left-side chat rail that fills stage height and supports emoji text chat with an emoji-picker popup.
 9. Splash screen appears at root (`/`) every visit and includes first menu actions.
 10. Seasons use 9 keyframes for visual transition while gameplay logic flips at season boundary.
 
@@ -45,7 +45,7 @@ If this file conflicts with code, update this file in the same change set.
 5. Build factories and man-made ponds on owned `GRASS`/`FOREST` tiles.
 6. Craft refrigerators or blue ice at owned factories.
 7. Sell at owned houses and use train yearly shipment window.
-8. Win on net worth at match end.
+8. Win on highest money at match end.
 
 ## Economy Defaults (Current)
 - Start per player: `$20`, `0 ice`, `0 blue ice`, `1 refrigerator`.

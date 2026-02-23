@@ -363,6 +363,46 @@ describe('season and pond systems', () => {
   });
 });
 
+describe('match outcome rules', () => {
+  test('time winner is based on highest money (not net worth)', () => {
+    const engine = createHeadToHeadEngine({ win: { overtimeEnabled: false } });
+    const state = engine.getState();
+
+    state.players.P1.money = 12;
+    state.players.P1.ice = 0;
+    state.players.P1.blueIce = 0;
+    state.players.P1.refrigerators = 0;
+
+    state.players.P2.money = 8;
+    state.players.P2.ice = 25;
+    state.players.P2.blueIce = 4;
+    state.players.P2.refrigerators = 8;
+
+    state.match.durationMs = 1;
+    engine.tick(1);
+
+    expect(state.match.ended).toBe(true);
+    expect(state.match.winnerId).toBe('P1');
+  });
+
+  test('time tie on money is a draw when overtime is disabled', () => {
+    const engine = createHeadToHeadEngine({ win: { overtimeEnabled: false } });
+    const state = engine.getState();
+
+    state.players.P1.money = 10;
+    state.players.P2.money = 10;
+    state.players.P2.ice = 50;
+    state.players.P2.blueIce = 10;
+    state.players.P2.refrigerators = 12;
+
+    state.match.durationMs = 1;
+    engine.tick(1);
+
+    expect(state.match.ended).toBe(true);
+    expect(state.match.winnerId).toBeNull();
+  });
+});
+
 describe('bot behavior constraints', () => {
   test('external bot mode enforces bot identity and cadence throttle', () => {
     const engine = GameEngine.createPlayVsComputer('bot-test', 'Human', 'DEV_FAST', 'EXTERNAL');

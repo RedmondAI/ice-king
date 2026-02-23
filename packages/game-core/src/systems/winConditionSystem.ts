@@ -1,7 +1,6 @@
 import type { GameConfig } from '@ice-king/config';
 import type { GameState } from '@ice-king/shared';
 import { addLog } from '../helpers';
-import { computeNetWorth } from './economySystem';
 
 export interface MatchOutcome {
   ended: boolean;
@@ -11,25 +10,6 @@ export interface MatchOutcome {
 
 export function syncTrainYear(state: GameState): void {
   state.trainSales.currentYear = Math.floor(state.season.seasonFlipCount / 2) + 1;
-}
-
-function applyTieBreaker(state: GameState, firstId: string, secondId: string): string | null {
-  const first = state.players[firstId];
-  const second = state.players[secondId];
-
-  if (!first || !second) {
-    return null;
-  }
-
-  if (first.blueIce !== second.blueIce) {
-    return first.blueIce > second.blueIce ? firstId : secondId;
-  }
-
-  if (first.money !== second.money) {
-    return first.money > second.money ? firstId : secondId;
-  }
-
-  return null;
 }
 
 export function evaluateTimeWin(state: GameState, config: GameConfig): MatchOutcome {
@@ -49,36 +29,39 @@ export function evaluateTimeWin(state: GameState, config: GameConfig): MatchOutc
     };
   }
 
-  const [first, second] = computeNetWorth(state, config).sort((a, b) => b.value - a.value);
+  const score = state.playerOrder
+    .map((playerId) => ({
+      playerId,
+      money: state.players[playerId]?.money ?? 0,
+    }))
+    .sort((a, b) => b.money - a.money);
 
-  if (first.value > second.value) {
+  const [first, second] = score;
+  if (!first || !second) {
+    state.match.ended = true;
+    state.match.winnerId = null;
+    addLog(state, 'match.ended', {
+      reason: 'DRAW',
+      score,
+    });
+    return {
+      ended: true,
+      winnerId: null,
+      reason: 'DRAW',
+    };
+  }
+
+  if (first.money > second.money) {
     state.match.ended = true;
     state.match.winnerId = first.playerId;
     addLog(state, 'match.ended', {
       reason: 'TIME',
       winnerId: first.playerId,
-      score: [first, second],
+      score,
     });
     return {
       ended: true,
       winnerId: first.playerId,
-      reason: 'TIME',
-    };
-  }
-
-  const tieBreakWinner = applyTieBreaker(state, first.playerId, second.playerId);
-  if (tieBreakWinner) {
-    state.match.ended = true;
-    state.match.winnerId = tieBreakWinner;
-    addLog(state, 'match.ended', {
-      reason: 'TIME',
-      winnerId: tieBreakWinner,
-      score: [first, second],
-      tiebreak: true,
-    });
-    return {
-      ended: true,
-      winnerId: tieBreakWinner,
       reason: 'TIME',
     };
   }
@@ -101,7 +84,7 @@ export function evaluateTimeWin(state: GameState, config: GameConfig): MatchOutc
   state.match.winnerId = null;
   addLog(state, 'match.ended', {
     reason: 'DRAW',
-    score: [first, second],
+    score,
   });
 
   return {

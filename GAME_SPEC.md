@@ -38,7 +38,7 @@ Last updated: 2026-02-23
 - Build factories and man-made ponds on owned `GRASS`/`FOREST`.
 - Craft refrigerators or blue ice at owned factories.
 - Sell at owned houses and use yearly train shipment.
-- Win by higher net worth.
+- Win by higher money.
 
 ## Economy (Default Config)
 - Start per player: `$20`, `0 ice`, `0 blue ice`, `1 refrigerator`.
@@ -125,7 +125,7 @@ Last updated: 2026-02-23
 - Includes `Other User's Stats` beneath the local player stats, with border color based on opponent color.
 - Multiplayer chat panel:
 - In multiplayer matches only, a full-height chat window appears on the left side of the map.
-- Supports standard text chat and emoji entry, with Enter-to-send and Shift+Enter for newline.
+- Supports standard text chat and emoji entry, with an emoji-picker popup, Enter-to-send, and Shift+Enter for newline.
 - Tile action menu:
 - Hidden by default.
 - Appears as a small popup above the selected tile after the second click on the same tile (two-step selection).

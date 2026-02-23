@@ -86,7 +86,7 @@ export class HudLayer {
       'Welcome, Your Majesty.',
       '',
       'Goal:',
-      '  End the match with the highest net worth: cash + land + ice + industry.',
+      '  End the match with the highest money total.',
       '',
       'How To Rule:',
       '  1) Buy land. Click a tile to select it, then click again to open Tile Actions.',
