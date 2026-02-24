@@ -141,6 +141,7 @@ export interface GameState {
   tiles: TileState[];
   players: Record<string, PlayerState>;
   playerOrder: string[];
+  summerSkipVotesByPlayerId: Record<string, boolean>;
   bots: Record<string, BotControllerState>;
   season: SeasonState;
   ponds: PondHarvestJob[];
@@ -203,6 +204,7 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   gameActionBase.extend({ type: z.literal('tile.buildManMadePond'), ...coordinateSchema.shape }),
   gameActionBase.extend({ type: z.literal('pond.harvest.start'), ...coordinateSchema.shape }),
   gameActionBase.extend({ type: z.literal('pond.harvest.claim'), pondJobId: z.string().min(1) }),
+  gameActionBase.extend({ type: z.literal('season.skipSummerVote') }),
   gameActionBase.extend({ type: z.literal('structure.house.sellIce'), ...coordinateSchema.shape, quantity: z.number().int().positive() }),
   gameActionBase.extend({ type: z.literal('structure.house.sellBlueIce'), ...coordinateSchema.shape, quantity: z.number().int().positive() }),
   gameActionBase.extend({ type: z.literal('structure.factory.craftRefrigerator'), ...coordinateSchema.shape }),

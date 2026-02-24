@@ -34,6 +34,9 @@ export class HudLayer {
   private readonly toastStack: HTMLDivElement;
   private readonly popupHost: HTMLDivElement;
   private readonly opponentHead: HTMLDivElement;
+  private readonly skipSummerButton: HTMLButtonElement;
+  private readonly skipSummerLabel: HTMLSpanElement;
+  private readonly skipSummerStatus: HTMLDivElement;
 
   private readonly statRows: Record<string, HTMLSpanElement>;
   private readonly opponentStatRows: Record<string, HTMLSpanElement>;
@@ -50,6 +53,7 @@ export class HudLayer {
     mount: HTMLElement,
     onPopupActionClick: (actionId: string) => void,
     sideRailMount?: HTMLElement,
+    onSkipSummerClick?: () => void,
   ) {
     this.overlay = document.createElement('div');
     this.overlay.className = 'overlay-layer';
@@ -187,8 +191,43 @@ export class HudLayer {
       }),
     ) as Record<string, HTMLSpanElement>;
 
+    this.skipSummerButton = document.createElement('button');
+    this.skipSummerButton.className = 'skip-summer-button';
+    this.skipSummerButton.type = 'button';
+    this.skipSummerButton.style.display = 'none';
+    this.skipSummerButton.addEventListener('click', () => {
+      onSkipSummerClick?.();
+    });
+
+    const skipSummerIcon = document.createElement('span');
+    skipSummerIcon.className = 'skip-summer-icon';
+
+    const skipSummerSun = document.createElement('span');
+    skipSummerSun.className = 'skip-summer-sun';
+    const skipSummerSnow = document.createElement('span');
+    skipSummerSnow.className = 'skip-summer-snow';
+    skipSummerIcon.append(skipSummerSun, skipSummerSnow);
+
+    this.skipSummerLabel = document.createElement('span');
+    this.skipSummerLabel.className = 'skip-summer-label';
+    this.skipSummerLabel.textContent = 'skip summer';
+
+    this.skipSummerButton.append(skipSummerIcon, this.skipSummerLabel);
+
+    this.skipSummerStatus = document.createElement('div');
+    this.skipSummerStatus.className = 'skip-summer-status';
+    this.skipSummerStatus.style.display = 'none';
+
     this.instructions.append(instructionsHead, this.instructionsBody);
-    this.hud.append(this.instructions, hudHead, this.hudBody, this.opponentHead, this.opponentHudBody);
+    this.hud.append(
+      this.instructions,
+      hudHead,
+      this.hudBody,
+      this.opponentHead,
+      this.opponentHudBody,
+      this.skipSummerButton,
+      this.skipSummerStatus,
+    );
 
     this.debugToggleButton = document.createElement('button');
     this.debugToggleButton.className = 'pixel-button debug-toggle';
@@ -303,6 +342,39 @@ export class HudLayer {
     } else {
       this.opponentHead.style.borderColor = 'var(--ui-border)';
       this.opponentHudBody.style.borderColor = 'var(--ui-border)';
+    }
+
+    const canVoteToSkipSummer = Boolean(
+      player &&
+        opponent &&
+        player.controller === 'HUMAN' &&
+        opponent.controller === 'HUMAN' &&
+        state.season.logicSeason === 'SUMMER' &&
+        !state.match.ended,
+    );
+    this.skipSummerButton.style.display = canVoteToSkipSummer ? 'flex' : 'none';
+    this.skipSummerStatus.style.display = canVoteToSkipSummer ? 'block' : 'none';
+
+    if (canVoteToSkipSummer && opponentId) {
+      const playerVoted = state.summerSkipVotesByPlayerId[playerId] === true;
+      const opponentVoted = state.summerSkipVotesByPlayerId[opponentId] === true;
+
+      this.skipSummerButton.disabled = playerVoted;
+      this.skipSummerLabel.textContent = playerVoted ? 'vote locked' : 'skip summer';
+
+      if (playerVoted && opponentVoted) {
+        this.skipSummerStatus.textContent = 'Both voted. Skipping to winter.';
+      } else if (playerVoted) {
+        this.skipSummerStatus.textContent = 'Vote sent. Waiting for the other player.';
+      } else if (opponentVoted) {
+        this.skipSummerStatus.textContent = 'Other player voted. Click to agree and skip.';
+      } else {
+        this.skipSummerStatus.textContent = 'Both players must vote to skip summer.';
+      }
+    } else {
+      this.skipSummerButton.disabled = true;
+      this.skipSummerLabel.textContent = 'skip summer';
+      this.skipSummerStatus.textContent = '';
     }
 
     const cycleElapsed = state.nowMs - state.season.cycleStartMs;

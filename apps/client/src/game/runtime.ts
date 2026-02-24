@@ -310,7 +310,12 @@ export class GameRuntime {
     logoBadge.src = iceKingLogoUrl;
     logoBadge.alt = 'Ice King logo';
 
-    this.hud = new HudLayer(this.gameLayer, this.handlePopupAction, this.sideRail);
+    this.hud = new HudLayer(
+      this.gameLayer,
+      this.handlePopupAction,
+      this.sideRail,
+      this.handleSkipSummerVote,
+    );
 
     this.minimap = new MinimapController(this.minimapCanvas, (x, y) => {
       this.dispatchAction({
@@ -1268,6 +1273,25 @@ export class GameRuntime {
     const tilePoint = tileToScreen(this.engine.getState(), this.playerId, tileX, tileY);
     return this.canvasToOverlayPoint(tilePoint.x + TILE_SIZE / 2, tilePoint.y + TILE_SIZE / 2);
   }
+
+  private handleSkipSummerVote = (): void => {
+    const beforeSeason = this.engine.getState().season.logicSeason;
+    const result = this.dispatchAction({
+      type: 'season.skipSummerVote',
+      playerId: this.playerId,
+    });
+    if (!result.ok) {
+      return;
+    }
+
+    const afterSeason = this.engine.getState().season.logicSeason;
+    if (beforeSeason === 'SUMMER' && afterSeason === 'WINTER') {
+      this.hud.showToast('Both players voted. Summer skipped.');
+      return;
+    }
+
+    this.hud.showToast('Vote recorded. Waiting for the other player.');
+  };
 
   private updateHud(): void {
     const split = this.engine.getPlayerStorage(this.playerId);

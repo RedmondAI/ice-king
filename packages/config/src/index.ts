@@ -3,6 +3,7 @@ import type { Season } from '@ice-king/shared';
 export interface EconomyConfig {
   buyUnownedTileCost: number;
   buyoutTransferFee: number;
+  seasonFlipIncome: number;
   pondHarvestCost: number;
   houseSellIcePrice: number;
   houseSellBlueIcePrice: number;
@@ -69,6 +70,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   economy: {
     buyUnownedTileCost: 1,
     buyoutTransferFee: 1,
+    seasonFlipIncome: 2,
     pondHarvestCost: 1,
     houseSellIcePrice: 2,
     houseSellBlueIcePrice: 8,

@@ -488,6 +488,102 @@ input {
   gap: 12px;
 }
 
+.skip-summer-button {
+  width: 100%;
+  min-height: 46px;
+  border: 3px solid #5f4624;
+  background:
+    linear-gradient(180deg, rgba(255, 214, 114, 0.95) 0%, rgba(135, 211, 255, 0.95) 100%),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.14) 0px,
+      rgba(255, 255, 255, 0.14) 6px,
+      rgba(0, 0, 0, 0.06) 6px,
+      rgba(0, 0, 0, 0.06) 12px
+    );
+  color: #3e2723;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.skip-summer-button:hover {
+  transform: translateY(-1px);
+}
+
+.skip-summer-button:active {
+  transform: translateY(1px);
+}
+
+.skip-summer-button[disabled] {
+  opacity: 0.72;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.skip-summer-icon {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  flex: 0 0 30px;
+}
+
+.skip-summer-icon::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: -1px;
+  width: 3px;
+  height: 20px;
+  background: #6b4f2a;
+  transform: rotate(24deg);
+}
+
+.skip-summer-sun {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #8a5700;
+  background: #ffd84a;
+  box-shadow:
+    0 -4px 0 -2px #ffd84a,
+    0 4px 0 -2px #ffd84a,
+    -4px 0 0 -2px #ffd84a,
+    4px 0 0 -2px #ffd84a;
+}
+
+.skip-summer-snow {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  background:
+    linear-gradient(90deg, transparent 5px, #d8f4ff 5px, #d8f4ff 7px, transparent 7px),
+    linear-gradient(0deg, transparent 5px, #d8f4ff 5px, #d8f4ff 7px, transparent 7px),
+    linear-gradient(45deg, transparent 5px, #d8f4ff 5px, #d8f4ff 7px, transparent 7px),
+    linear-gradient(-45deg, transparent 5px, #d8f4ff 5px, #d8f4ff 7px, transparent 7px);
+  filter: drop-shadow(0 0 0 #4b82af);
+}
+
+.skip-summer-label {
+  font-size: 9px;
+  text-transform: lowercase;
+}
+
+.skip-summer-status {
+  font-size: 8px;
+  line-height: 1.45;
+  color: #4e3a1f;
+  margin-top: 4px;
+  min-height: 20px;
+}
+
 .warning {
   color: #9b2f2f;
 }

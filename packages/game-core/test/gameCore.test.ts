@@ -234,6 +234,53 @@ describe('season and pond systems', () => {
     expect(season.transitionProgress).toBe(0);
   });
 
+  test('players receive free money on each season flip', () => {
+    const engine = createHeadToHeadEngine({ economy: { seasonFlipIncome: 2 } });
+    const state = engine.getState();
+
+    state.players.P1.money = 0;
+    state.players.P2.money = 3;
+
+    engine.tick(1000);
+    expect(state.players.P1.money).toBe(2);
+    expect(state.players.P2.money).toBe(5);
+
+    engine.tick(1000);
+    expect(state.players.P1.money).toBe(4);
+    expect(state.players.P2.money).toBe(7);
+  });
+
+  test('summer skip requires both votes and then flips to winter', () => {
+    const engine = createHeadToHeadEngine({
+      startingSeason: 'SUMMER',
+      economy: { seasonFlipIncome: 2 },
+    });
+    const state = engine.getState();
+
+    state.players.P1.money = 1;
+    state.players.P2.money = 4;
+
+    const firstVote = engine.applyAction({
+      type: 'season.skipSummerVote',
+      playerId: 'P1',
+    });
+    expect(firstVote.ok).toBe(true);
+    expect(state.season.logicSeason).toBe('SUMMER');
+    expect(state.summerSkipVotesByPlayerId.P1).toBe(true);
+    expect(state.summerSkipVotesByPlayerId.P2).toBe(false);
+
+    const secondVote = engine.applyAction({
+      type: 'season.skipSummerVote',
+      playerId: 'P2',
+    });
+    expect(secondVote.ok).toBe(true);
+    expect(state.season.logicSeason).toBe('WINTER');
+    expect(state.players.P1.money).toBe(3);
+    expect(state.players.P2.money).toBe(6);
+    expect(state.summerSkipVotesByPlayerId.P1).toBe(false);
+    expect(state.summerSkipVotesByPlayerId.P2).toBe(false);
+  });
+
   test('pond harvest becomes claimable after harvest duration and can be claimed', () => {
     const engine = createHeadToHeadEngine({ startingSeason: 'WINTER' });
     const state = engine.getState();

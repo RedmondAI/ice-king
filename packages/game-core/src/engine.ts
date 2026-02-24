@@ -20,7 +20,7 @@ import {
   startFactoryCraft,
   updateFactoryJobs,
 } from './systems/structureSystem';
-import { updateSeasonClock } from './systems/seasonSystem';
+import { forceSeasonFlip, updateSeasonClock, type SeasonFlip } from './systems/seasonSystem';
 import { evaluateTimeWin, forfeitMatch, syncTrainYear } from './systems/winConditionSystem';
 import { chooseHeuristicBotAction, enumerateCandidateBotActions, tickBots } from './systems/botSystem';
 
@@ -110,6 +110,27 @@ export class GameEngine {
     return playerStorageSplit(player, this.config.economy.refrigeratorStoragePerUnit);
   }
 
+  private resetSummerSkipVotes(): void {
+    for (const playerId of this.state.playerOrder) {
+      this.state.summerSkipVotesByPlayerId[playerId] = false;
+    }
+  }
+
+  private applySeasonFlipEffects(flip: SeasonFlip): void {
+    this.resetSummerSkipVotes();
+
+    const seasonFlipIncome = this.config.economy.seasonFlipIncome;
+    if (seasonFlipIncome !== 0) {
+      for (const player of Object.values(this.state.players)) {
+        player.money += seasonFlipIncome;
+      }
+    }
+
+    if (flip.from === 'WINTER' && flip.to === 'SUMMER') {
+      applyWinterToSummerMelt(this.state, this.config);
+    }
+  }
+
   tick(deltaMs: number): void {
     if (deltaMs <= 0) {
       return;
@@ -121,9 +142,7 @@ export class GameEngine {
       const seasonUpdate = updateSeasonClock(this.state, this.state.nowMs);
 
       for (const flip of seasonUpdate.flips) {
-        if (flip.from === 'WINTER' && flip.to === 'SUMMER') {
-          applyWinterToSummerMelt(this.state, this.config);
-        }
+        this.applySeasonFlipEffects(flip);
       }
 
       updatePondHarvestJobs(this.state);
@@ -233,6 +252,53 @@ export class GameEngine {
       case 'pond.harvest.claim':
         result = claimPondHarvest(this.state, this.config, action.playerId, action.pondJobId);
         break;
+      case 'season.skipSummerVote': {
+        const player = this.state.players[action.playerId];
+        if (!player) {
+          result = { ok: false, code: 'INVALID_PLAYER', message: 'Unknown player.' };
+          break;
+        }
+        if (player.controller !== 'HUMAN') {
+          result = {
+            ok: false,
+            code: 'INVALID_ACTION',
+            message: 'Only human players can vote to skip summer.',
+          };
+          break;
+        }
+        if (this.state.season.logicSeason !== 'SUMMER') {
+          result = {
+            ok: false,
+            code: 'WRONG_SEASON',
+            message: 'Summer can only be skipped during summer.',
+          };
+          break;
+        }
+
+        this.state.summerSkipVotesByPlayerId[action.playerId] = true;
+        const allPlayersVoted = this.state.playerOrder.every(
+          (playerId) => this.state.summerSkipVotesByPlayerId[playerId] === true,
+        );
+
+        if (allPlayersVoted) {
+          const forcedFlip = forceSeasonFlip(this.state, 'WINTER');
+          if (forcedFlip) {
+            this.applySeasonFlipEffects(forcedFlip);
+          }
+        }
+
+        result = {
+          ok: true,
+          code: 'OK',
+          message: allPlayersVoted
+            ? 'Both players voted. Summer skipped to winter.'
+            : 'Summer skip vote recorded.',
+          payload: {
+            allPlayersVoted,
+          },
+        };
+        break;
+      }
       case 'structure.house.sellIce':
         result = sellIceAtHouse(
           this.state,

@@ -84,6 +84,9 @@ export function createInitialState(options: CreateInitialStateOptions): GameStat
   const usedByPlayerId = Object.fromEntries(
     playerInputs.map((input) => [input.id, null]),
   ) as Record<string, number | null>;
+  const summerSkipVotesByPlayerId = Object.fromEntries(
+    playerInputs.map((input) => [input.id, false]),
+  ) as Record<string, boolean>;
 
   return {
     seed: options.seed,
@@ -93,6 +96,7 @@ export function createInitialState(options: CreateInitialStateOptions): GameStat
     tiles: generated.tiles,
     players: playerStates,
     playerOrder: playerInputs.map((input) => input.id),
+    summerSkipVotesByPlayerId,
     bots: botControllers,
     season: {
       logicSeason: config.startingSeason,

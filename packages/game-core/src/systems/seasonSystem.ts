@@ -44,3 +44,21 @@ export function updateSeasonClock(state: GameState, nowMs: number): SeasonUpdate
 
   return { flips };
 }
+
+export function forceSeasonFlip(state: GameState, to: Season): SeasonFlip | null {
+  const season = state.season;
+  const from = season.logicSeason;
+  if (from === to) {
+    return null;
+  }
+
+  season.logicSeason = to;
+  season.cycleStartMs = state.nowMs;
+  season.seasonFlipCount += 1;
+  season.transitionProgress = 0;
+  season.transitionKeyframeIndex = 0;
+  season.visualFromSeason = to;
+  season.visualToSeason = oppositeSeason(to);
+
+  return { from, to };
+}
