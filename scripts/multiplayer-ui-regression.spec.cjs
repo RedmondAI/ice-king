@@ -121,6 +121,13 @@ async function readRenderState(page) {
   return JSON.parse(raw);
 }
 
+async function createAccount(page, username, password) {
+  await page.locator('input[placeholder="Username"]').fill(username);
+  await page.locator('input[placeholder="Password (min 4 chars)"]').fill(password);
+  await page.getByRole('button', { name: 'Create Account' }).click();
+  await expect(page.locator('p').filter({ hasText: `Signed in as ${username}.` })).toBeVisible();
+}
+
 test.beforeAll(async () => {
   devServer = spawnDevServer();
   await waitForServerReady();
@@ -156,15 +163,13 @@ test('multiplayer flow: create, join, ready, start, action', async ({ browser })
     await host.goto(BASE_URL);
     await guest.goto(BASE_URL);
 
-    const hostNameInput = host.locator('input');
-    await hostNameInput.fill('Host CI');
+    await createAccount(host, 'Host CI', 'pass1');
     await host.getByRole('button', { name: 'Create Game' }).click();
 
     await expect(host.getByRole('heading', { name: 'Lobby' })).toBeVisible();
     const roomCode = await readLobbyRoomCode(host);
 
-    const guestNameInput = guest.locator('input');
-    await guestNameInput.fill('Guest CI');
+    await createAccount(guest, 'Guest CI', 'pass2');
 
     const joinDialogHandled = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {

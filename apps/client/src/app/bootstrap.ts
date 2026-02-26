@@ -13,6 +13,7 @@ import {
   type MultiplayerLobbyState,
   type MultiplayerSession,
 } from '../multiplayer/client';
+import { createAccount, getAuthenticatedUsername, isSameUser, login, logout } from './auth';
 
 interface AppContext {
   root: HTMLElement;
@@ -193,6 +194,7 @@ function formatPauseCountdown(timeoutAtMs: number | null, disconnectedPlayerId: 
 function renderSplash(ctx: AppContext): void {
   clearRoot(ctx.root);
   ctx.multiplayerSession = null;
+  ctx.playerName = getAuthenticatedUsername() ?? '';
 
   const shell = document.createElement('div');
   shell.className = 'app-shell splash-screen';
@@ -232,15 +234,20 @@ function renderSplash(ctx: AppContext): void {
 
   const roomFromQuery = normalizeRoomCode(new URLSearchParams(window.location.search).get('room') ?? '');
   const storedSession = roomFromQuery ? getStoredSession(roomFromQuery) : null;
-  if (!ctx.playerName && storedSession?.playerName) {
-    ctx.playerName = storedSession.playerName;
-  }
+  const canReconnectStoredSession =
+    Boolean(storedSession && ctx.playerName) && isSameUser(storedSession?.playerName ?? '', ctx.playerName);
 
-  const nameInput = document.createElement('input');
-  nameInput.className = 'text-input';
-  nameInput.placeholder = 'Display name';
-  nameInput.maxLength = 24;
-  nameInput.value = ctx.playerName;
+  const authPanel = document.createElement('div');
+  authPanel.className = 'auth-panel';
+
+  const authStatus = document.createElement('p');
+  authStatus.className = 'subtle';
+
+  const authMessage = document.createElement('p');
+  authMessage.className = 'subtle auth-message';
+
+  let authUsernameInput: HTMLInputElement | null = null;
+  let authPasswordInput: HTMLInputElement | null = null;
 
   const menuGrid = document.createElement('div');
   menuGrid.className = 'menu-grid';
@@ -249,12 +256,16 @@ function renderSplash(ctx: AppContext): void {
   reconnectHint.className = 'subtle';
   reconnectHint.style.opacity = '0.9';
   reconnectHint.style.marginBottom = '0';
-  if (roomFromQuery && storedSession) {
+  if (roomFromQuery && storedSession && canReconnectStoredSession) {
     reconnectHint.textContent = `Stored session found for room ${roomFromQuery}.`;
+  } else if (roomFromQuery && storedSession) {
+    reconnectHint.textContent = `Invite detected: ${roomFromQuery}. Log in as ${storedSession.playerName} to reconnect.`;
   } else if (roomFromQuery) {
     reconnectHint.textContent = `Invite detected: ${roomFromQuery}.`;
+  } else if (ctx.playerName) {
+    reconnectHint.textContent = 'Enter starts Play vs Computer.';
   } else {
-    reconnectHint.textContent = 'Enter starts Play vs Computer when a display name is set.';
+    reconnectHint.textContent = 'Create an account or log in to play.';
   }
 
   const showSoonToast = (feature: string) => {
@@ -283,7 +294,7 @@ function renderSplash(ctx: AppContext): void {
   };
 
   const attemptReconnect = () => {
-    if (!storedSession || isBusy || !ctx.playerName) {
+    if (!storedSession || !canReconnectStoredSession || isBusy || !ctx.playerName) {
       return;
     }
     const resolvedSession = storedSession.session;
@@ -317,6 +328,41 @@ function renderSplash(ctx: AppContext): void {
         isBusy = false;
         updateMenuDisabled();
       });
+  };
+
+  const setAuthMessage = (message: string): void => {
+    authMessage.textContent = message;
+  };
+
+  const rerenderSplash = (): void => {
+    detachKeyListener();
+    renderSplash(ctx);
+  };
+
+  const attemptLogin = (): void => {
+    if (isBusy || !authUsernameInput || !authPasswordInput) {
+      return;
+    }
+    const result = login(authUsernameInput.value, authPasswordInput.value);
+    if (!result.ok) {
+      setAuthMessage(result.error);
+      return;
+    }
+    ctx.playerName = result.username;
+    rerenderSplash();
+  };
+
+  const attemptCreateAccount = (): void => {
+    if (isBusy || !authUsernameInput || !authPasswordInput) {
+      return;
+    }
+    const result = createAccount(authUsernameInput.value, authPasswordInput.value);
+    if (!result.ok) {
+      setAuthMessage(result.error);
+      return;
+    }
+    ctx.playerName = result.username;
+    rerenderSplash();
   };
 
   const createGameButton = createButton('Create Game', () => {
@@ -383,7 +429,7 @@ function renderSplash(ctx: AppContext): void {
 
   const reconnectButton = createButton('Reconnect Last Session', () => {
     attemptReconnect();
-  }, !storedSession || !ctx.playerName);
+  }, !storedSession || !canReconnectStoredSession);
 
   const playVsComputerButton = createButton('Play vs Computer', () => {
     beginLobby('BOT');
@@ -397,7 +443,7 @@ function renderSplash(ctx: AppContext): void {
         '2) Own ponds in winter to start harvest jobs.',
         '3) Harvest ice (default 1:00) and collect when ready. Refrigerators protect it from summer melt.',
         '4) Build factories/ponds and sell at houses/train.',
-        '5) Highest net worth at match end wins.',
+        '5) Highest money at match end wins.',
       ].join('\n'),
     );
   });
@@ -410,14 +456,44 @@ function renderSplash(ctx: AppContext): void {
     const missingName = ctx.playerName.length === 0;
     createGameButton.disabled = missingName || isBusy;
     joinGameButton.disabled = missingName || isBusy;
-    reconnectButton.disabled = !storedSession || missingName || isBusy;
+    reconnectButton.disabled = !canReconnectStoredSession || missingName || isBusy;
     playVsComputerButton.disabled = missingName || isBusy;
   };
 
-  nameInput.addEventListener('input', () => {
-    ctx.playerName = nameInput.value.trim();
-    updateMenuDisabled();
-  });
+  if (ctx.playerName) {
+    authStatus.textContent = `Signed in as ${ctx.playerName}.`;
+    const logoutButton = createButton('Log Out', () => {
+      logout();
+      ctx.playerName = '';
+      rerenderSplash();
+    });
+    authPanel.append(authStatus, logoutButton);
+  } else {
+    authStatus.textContent = 'Use a username + password to create an account or log in.';
+
+    authUsernameInput = document.createElement('input');
+    authUsernameInput.className = 'text-input';
+    authUsernameInput.placeholder = 'Username';
+    authUsernameInput.maxLength = 24;
+
+    authPasswordInput = document.createElement('input');
+    authPasswordInput.className = 'text-input';
+    authPasswordInput.placeholder = 'Password (min 4 chars)';
+    authPasswordInput.type = 'password';
+
+    const authActions = document.createElement('div');
+    authActions.className = 'auth-actions';
+
+    const loginButton = createButton('Log In', () => {
+      attemptLogin();
+    });
+    const createAccountButton = createButton('Create Account', () => {
+      attemptCreateAccount();
+    });
+
+    authActions.append(loginButton, createAccountButton);
+    authPanel.append(authStatus, authUsernameInput, authPasswordInput, authActions, authMessage);
+  }
 
   if (storedSession) {
     menuGrid.append(createGameButton, joinGameButton, reconnectButton, playVsComputerButton, howToPlayButton, settingsButton);
@@ -426,16 +502,24 @@ function renderSplash(ctx: AppContext): void {
   }
 
   const keyListener = (event: KeyboardEvent) => {
-    if (event.key === 'Enter' && ctx.playerName.length > 0) {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    if (ctx.playerName.length > 0) {
       event.preventDefault();
       beginLobby('BOT');
+      return;
+    }
+    if (authUsernameInput && authPasswordInput) {
+      event.preventDefault();
+      attemptLogin();
     }
   };
 
   window.addEventListener('keydown', keyListener);
   updateMenuDisabled();
 
-  card.append(logo, subtitle, points, nameInput, menuGrid, reconnectHint);
+  card.append(logo, subtitle, points, authPanel, menuGrid, reconnectHint);
   shell.append(artWrap, vignette, frost, card);
   ctx.root.append(shell);
 }
@@ -804,8 +888,7 @@ function renderEnd(ctx: AppContext, winnerName: string | null, reason: string): 
 
 export function bootstrapApp(root: HTMLElement): void {
   const roomFromQuery = normalizeRoomCode(new URLSearchParams(window.location.search).get('room') ?? '');
-  const persistedSession = roomFromQuery ? getStoredSession(roomFromQuery) : null;
-  const initialName = persistedSession?.playerName ?? '';
+  const initialName = getAuthenticatedUsername() ?? '';
   const ctx: AppContext = {
     root,
     runtime: null,

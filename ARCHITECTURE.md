@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-Last updated: 2026-02-23
+Last updated: 2026-02-26
 
 ## Architecture Style
 - Current architecture is modular state + systems (not ECS).
@@ -27,7 +27,7 @@ Last updated: 2026-02-23
 
 ## Runtime Flow
 1. `bootstrapApp` renders splash on root every visit.
-2. Splash acts as first menu surface (name + Create/Join/Play vs Computer/How to Play/Settings).
+2. Splash acts as first menu surface with local account auth (username/password create+login) and menu controls (Create/Join/Play vs Computer/How to Play/Settings).
 3. Lobby is rendered for either `Play vs Computer` or `Create/Join` multiplayer room flow.
 4. `GameRuntime` runs either:
 - local play-vs-computer engine, or

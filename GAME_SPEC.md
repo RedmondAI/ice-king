@@ -1,6 +1,6 @@
 # GAME_SPEC
 
-Last updated: 2026-02-23
+Last updated: 2026-02-26
 
 ## Current Playable Mode
 - Supported modes:
@@ -29,6 +29,15 @@ Last updated: 2026-02-23
   - rooms expire after inactivity and return `ROOM_EXPIRED` from state/action/join APIs;
   - expired response includes readable `details`.
   - expiry timer defaults to 6 hours (`ICEKING_MULTIPLAYER_ROOM_TTL_MS`) and can be shortened for test runs.
+
+## Account Auth (Current)
+- Splash is account-gated with local username/password auth.
+- Required fields:
+  - `username`
+  - `password` (minimum `4` characters).
+- No email is used.
+- Account records are stored in browser `localStorage` for local/dev play.
+- Logged-in username is used as the player name for `Play vs Computer` and multiplayer create/join.
 
 ## Core Loop
 - Expand by buying tiles.
@@ -114,8 +123,8 @@ Last updated: 2026-02-23
 
 ## UI Behavior Rules
 - Root (`http://localhost:5173/`) always opens splash screen.
-- Splash includes first menu controls (name input + buttons).
-- `Enter` on splash starts Play-vs-Computer when display name is set.
+- Splash includes account controls (create/login/logout) plus the main menu buttons.
+- `Enter` on splash starts Play-vs-Computer when logged in.
 - Instructions panel:
 - Above Stats, collapsed by default.
 - Provides a themed summary of the rules and controls.

@@ -2,6 +2,32 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-26 (Milestone Update 37)
+- Added splash-level local account auth (username/password) for client entry flow:
+  - new auth module with localStorage-backed account creation/login/logout.
+  - password validation now enforces minimum length of `4`.
+  - no email required.
+- Updated splash/menu wiring:
+  - unauthenticated users now see Username + Password fields with `Create Account` and `Log In`.
+  - authenticated users see signed-in status and `Log Out`.
+  - Create/Join/Play flows now use logged-in username as player name.
+  - reconnect button is now gated to stored sessions that belong to the logged-in account.
+- Updated multiplayer Playwright UI regression to create accounts before host/guest room flow.
+- Synced docs for account-gated splash behavior.
+- Files updated:
+  - `apps/client/src/app/auth.ts`
+  - `apps/client/src/app/bootstrap.ts`
+  - `apps/client/src/styles.css`
+  - `scripts/multiplayer-ui-regression.spec.cjs`
+  - `GAME_SPEC.md`
+  - `ARCHITECTURE.md`
+  - `progress.md`
+- Validation:
+  - `npm run build` -> pass
+  - `npm run test` -> pass
+  - `npm run test:multiplayer:ui` -> pass (`1 passed`)
+  - `develop-web-game` Playwright client run via `web_game_playwright_client.js` -> pass (artifact screenshots in `output/web-game/auth-smoke/`)
+
 ## 2026-02-23 (Milestone Update 36)
 - Added multiplayer chat emoji-picker popup UI:
   - chat composer now has an `Emoji` button.
