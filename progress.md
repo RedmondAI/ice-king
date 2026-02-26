@@ -2,6 +2,17 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-26 (Milestone Update 39)
+- Updated new-account defaults:
+  - new users now start with `100` Ice Coins.
+  - this is applied during account creation only (existing users keep their current coin balances).
+- Files updated:
+  - `apps/client/src/app/auth.ts`
+  - `progress.md`
+- Validation:
+  - Playwright account-creation check: new user stats panel shows `Ice Coins: 100` (artifact: `output/web-game/stats-and-solo/new-user-100-coins.png`)
+  - `npm run build` -> pass
+
 ## 2026-02-26 (Milestone Update 38)
 - Added Create Game mode picker popup on splash:
   - `Create Game` now opens a modal with options:

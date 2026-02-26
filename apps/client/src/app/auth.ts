@@ -22,6 +22,7 @@ const USERS_STORE_KEY = 'iceking-auth-users-v1';
 const ACTIVE_USER_STORE_KEY = 'iceking-auth-active-user-v1';
 const MIN_PASSWORD_LENGTH = 4;
 const MAX_USERNAME_LENGTH = 24;
+const NEW_USER_STARTING_ICE_COINS = 100;
 
 export interface UserStats {
   iceCoins: number;
@@ -251,7 +252,10 @@ export function createAccount(rawUsername: string, password: string): AuthResult
   users[key] = {
     username: normalized,
     password,
-    stats: { ...DEFAULT_USER_STATS },
+    stats: {
+      ...DEFAULT_USER_STATS,
+      iceCoins: NEW_USER_STARTING_ICE_COINS,
+    },
   };
   writeUsers(users);
   setActiveUsername(normalized);
