@@ -1,5 +1,6 @@
 import { GameRuntime } from '../game/runtime';
 import type { GameState } from '@ice-king/shared';
+import type { GameMode, RuntimeOutcome } from '../game/types';
 import splashIceKingWebp from '../assets/splash-ice-king.webp';
 import iceKingLogoPng from '../assets/ui/ice-king-logo.png';
 import {
@@ -13,7 +14,15 @@ import {
   type MultiplayerLobbyState,
   type MultiplayerSession,
 } from '../multiplayer/client';
-import { createAccount, getAuthenticatedUsername, isSameUser, login, logout } from './auth';
+import {
+  createAccount,
+  getAuthenticatedUsername,
+  getUserStats,
+  isSameUser,
+  login,
+  logout,
+  recordGameResult,
+} from './auth';
 
 interface AppContext {
   root: HTMLElement;
@@ -21,6 +30,18 @@ interface AppContext {
   playerName: string;
   roomCode: string;
   multiplayerSession: MultiplayerSession | null;
+}
+
+type LobbyMode = 'HUMAN' | 'BOT' | 'NONE';
+
+function gameModeFromLobbyMode(mode: LobbyMode): GameMode {
+  if (mode === 'HUMAN') {
+    return 'PLAY_ONLINE';
+  }
+  if (mode === 'NONE') {
+    return 'SOLO';
+  }
+  return 'PLAY_VS_COMPUTER';
 }
 
 interface PersistedMultiplayerSession {
@@ -245,6 +266,8 @@ function renderSplash(ctx: AppContext): void {
 
   const authMessage = document.createElement('p');
   authMessage.className = 'subtle auth-message';
+  const accountStatsPanel = document.createElement('div');
+  accountStatsPanel.className = 'pixel-panel account-stats';
 
   let authUsernameInput: HTMLInputElement | null = null;
   let authPasswordInput: HTMLInputElement | null = null;
@@ -263,13 +286,13 @@ function renderSplash(ctx: AppContext): void {
   } else if (roomFromQuery) {
     reconnectHint.textContent = `Invite detected: ${roomFromQuery}.`;
   } else if (ctx.playerName) {
-    reconnectHint.textContent = 'Enter starts Play vs Computer.';
+    reconnectHint.textContent = 'Press Enter to open Create Game mode options.';
   } else {
     reconnectHint.textContent = 'Create an account or log in to play.';
   }
 
   const showSoonToast = (feature: string) => {
-    alert(`${feature} is scaffolded for a later milestone. Use Play vs Computer for v1 testing.`);
+    alert(`${feature} is scaffolded for a later milestone.`);
   };
 
   let isBusy = false;
@@ -283,7 +306,7 @@ function renderSplash(ctx: AppContext): void {
     keyListenerAttached = false;
   };
 
-  const beginLobby = (opponentType: 'HUMAN' | 'BOT') => {
+  const beginLobby = (opponentType: LobbyMode) => {
     if (!ctx.playerName) {
       return;
     }
@@ -309,7 +332,9 @@ function renderSplash(ctx: AppContext): void {
       .then((response) => {
         if (ctx.playerName.length === 0) {
           ctx.playerName = storedSession.playerName;
-          nameInput.value = storedSession.playerName;
+          if (authUsernameInput) {
+            authUsernameInput.value = storedSession.playerName;
+          }
         }
         ctx.roomCode = response.lobby.roomCode;
         ctx.multiplayerSession = resolvedSession;
@@ -365,10 +390,48 @@ function renderSplash(ctx: AppContext): void {
     rerenderSplash();
   };
 
-  const createGameButton = createButton('Create Game', () => {
+  let createModeOpen = false;
+  const createModeOverlay = document.createElement('div');
+  createModeOverlay.className = 'mode-picker-overlay';
+  createModeOverlay.style.display = 'none';
+
+  const createModeCard = document.createElement('div');
+  createModeCard.className = 'mode-picker-card pixel-panel';
+
+  const createModeTitle = document.createElement('h3');
+  createModeTitle.className = 'title';
+  createModeTitle.style.fontSize = '24px';
+  createModeTitle.textContent = 'Create Game';
+
+  const createModeSubtitle = document.createElement('p');
+  createModeSubtitle.className = 'subtle';
+  createModeSubtitle.textContent = 'Choose a game type:';
+
+  const createModeList = document.createElement('div');
+  createModeList.className = 'mode-picker-list';
+
+  const createModeClose = createButton('Close', () => {
+    createModeOpen = false;
+    createModeOverlay.style.display = 'none';
+    updateMenuDisabled();
+  });
+  createModeClose.classList.add('mode-picker-close');
+
+  const openCreateGamePicker = (): void => {
     if (isBusy || !ctx.playerName) {
       return;
     }
+    createModeOpen = true;
+    createModeOverlay.style.display = 'flex';
+    updateMenuDisabled();
+  };
+
+  const startOnlineGame = (): void => {
+    if (isBusy || !ctx.playerName) {
+      return;
+    }
+    createModeOpen = false;
+    createModeOverlay.style.display = 'none';
     isBusy = true;
     updateMenuDisabled();
     void createMultiplayerRoom(ctx.playerName, currentConfigMode(), roomFromQuery || null)
@@ -387,6 +450,98 @@ function renderSplash(ctx: AppContext): void {
         isBusy = false;
         updateMenuDisabled();
       });
+  };
+
+  const createModeOptions: Array<{
+    label: string;
+    description: string;
+    isLocked: boolean;
+    onSelect?: () => void;
+  }> = [
+    {
+      label: '1: Play vs Computer',
+      description: 'Local game versus the Ice Bot.',
+      isLocked: false,
+      onSelect: () => {
+        createModeOpen = false;
+        createModeOverlay.style.display = 'none';
+        beginLobby('BOT');
+      },
+    },
+    {
+      label: '2: Play Online',
+      description: 'Create an online room and invite another player.',
+      isLocked: false,
+      onSelect: () => {
+        startOnlineGame();
+      },
+    },
+    {
+      label: '3: Solo',
+      description: 'Single-player run. No computer opponent.',
+      isLocked: false,
+      onSelect: () => {
+        createModeOpen = false;
+        createModeOverlay.style.display = 'none';
+        beginLobby('NONE');
+      },
+    },
+    {
+      label: '4: Friendly (Locked)',
+      description: 'Costs 50 Ice Coins.',
+      isLocked: true,
+    },
+    {
+      label: '5: Team (Locked)',
+      description: 'Costs 80 Ice Coins.',
+      isLocked: true,
+    },
+    {
+      label: '6: Ice Wars (Locked)',
+      description: 'Costs 80 Ice Coins.',
+      isLocked: true,
+    },
+  ];
+
+  const createModeButtons: HTMLButtonElement[] = [];
+  for (const option of createModeOptions) {
+    const item = document.createElement('div');
+    item.className = 'mode-picker-item';
+
+    const button = createButton(option.label, () => {
+      if (option.isLocked || !option.onSelect) {
+        return;
+      }
+      option.onSelect();
+    }, option.isLocked);
+    button.classList.add('mode-picker-option');
+    if (option.isLocked) {
+      button.classList.add('mode-picker-option-locked');
+    }
+
+    const description = document.createElement('p');
+    description.className = 'subtle mode-picker-description';
+    description.textContent = option.description;
+
+    item.append(button, description);
+    createModeList.append(item);
+    if (!option.isLocked) {
+      createModeButtons.push(button);
+    }
+  }
+
+  createModeCard.append(createModeTitle, createModeSubtitle, createModeList, createModeClose);
+  createModeOverlay.append(createModeCard);
+  createModeOverlay.addEventListener('click', (event) => {
+    if (event.target === createModeOverlay) {
+      createModeOpen = false;
+      createModeOverlay.style.display = 'none';
+      updateMenuDisabled();
+    }
+  });
+
+  const createGameButton = createButton('Create Game', () => {
+    openCreateGamePicker();
   }, !ctx.playerName);
 
   const joinGameButton = createButton('Join Game', () => {
@@ -431,10 +586,6 @@ function renderSplash(ctx: AppContext): void {
     attemptReconnect();
   }, !storedSession || !canReconnectStoredSession);
 
-  const playVsComputerButton = createButton('Play vs Computer', () => {
-    beginLobby('BOT');
-  }, !ctx.playerName);
-
   const howToPlayButton = createButton('How to Play', () => {
     alert(
       [
@@ -454,10 +605,13 @@ function renderSplash(ctx: AppContext): void {
 
   const updateMenuDisabled = () => {
     const missingName = ctx.playerName.length === 0;
-    createGameButton.disabled = missingName || isBusy;
+    createGameButton.disabled = missingName || isBusy || createModeOpen;
     joinGameButton.disabled = missingName || isBusy;
     reconnectButton.disabled = !canReconnectStoredSession || missingName || isBusy;
-    playVsComputerButton.disabled = missingName || isBusy;
+    createModeClose.disabled = isBusy;
+    for (const button of createModeButtons) {
+      button.disabled = isBusy || missingName;
+    }
   };
 
   if (ctx.playerName) {
@@ -468,6 +622,38 @@ function renderSplash(ctx: AppContext): void {
       rerenderSplash();
     });
     authPanel.append(authStatus, logoutButton);
+
+    const stats = getUserStats(ctx.playerName);
+    const statsTitle = document.createElement('h3');
+    statsTitle.className = 'hud-title';
+    statsTitle.textContent = 'Account Stats';
+
+    const statsGrid = document.createElement('div');
+    statsGrid.className = 'account-stats-grid';
+    const statRows: Array<[string, string]> = [
+      ['Ice Coins', `${stats.iceCoins}`],
+      ['Games Played', `${stats.gamesPlayed}`],
+      ['Wins', `${stats.gamesWon}`],
+      ['Losses', `${stats.gamesLost}`],
+      ['Draws', `${stats.gamesDrawn}`],
+      ['Solo Runs', `${stats.soloGamesPlayed}`],
+      ['Best Solo', `$${stats.bestSoloMoney}c`],
+      ['Coins Earned (All Time)', `${stats.totalCoinsEarned}`],
+      ['Money Earned (All Time)', `$${stats.totalMoneyEarned}c`],
+    ];
+
+    for (const [label, value] of statRows) {
+      const row = document.createElement('div');
+      row.className = 'account-stats-row';
+      const key = document.createElement('span');
+      key.textContent = label;
+      const val = document.createElement('span');
+      val.textContent = value;
+      row.append(key, val);
+      statsGrid.append(row);
+    }
+
+    accountStatsPanel.append(statsTitle, statsGrid);
   } else {
     authStatus.textContent = 'Use a username + password to create an account or log in.';
 
@@ -496,21 +682,31 @@ function renderSplash(ctx: AppContext): void {
   }
 
   if (storedSession) {
-    menuGrid.append(createGameButton, joinGameButton, reconnectButton, playVsComputerButton, howToPlayButton, settingsButton);
+    menuGrid.append(createGameButton, joinGameButton, reconnectButton, howToPlayButton, settingsButton);
   } else {
-    menuGrid.append(createGameButton, joinGameButton, playVsComputerButton, howToPlayButton, settingsButton);
+    menuGrid.append(createGameButton, joinGameButton, howToPlayButton, settingsButton);
   }
 
   const keyListener = (event: KeyboardEvent) => {
-    if (event.key !== 'Enter') {
-      return;
-    }
     if (ctx.playerName.length > 0) {
-      event.preventDefault();
-      beginLobby('BOT');
+      if (event.key === 'Escape' && createModeOpen) {
+        event.preventDefault();
+        createModeOpen = false;
+        createModeOverlay.style.display = 'none';
+        updateMenuDisabled();
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (!createModeOpen) {
+          openCreateGamePicker();
+        }
+      }
       return;
     }
-    if (authUsernameInput && authPasswordInput) {
+
+    if (event.key === 'Enter' && authUsernameInput && authPasswordInput) {
       event.preventDefault();
       attemptLogin();
     }
@@ -519,7 +715,11 @@ function renderSplash(ctx: AppContext): void {
   window.addEventListener('keydown', keyListener);
   updateMenuDisabled();
 
-  card.append(logo, subtitle, points, authPanel, menuGrid, reconnectHint);
+  if (ctx.playerName) {
+    card.append(logo, subtitle, points, authPanel, accountStatsPanel, menuGrid, reconnectHint, createModeOverlay);
+  } else {
+    card.append(logo, subtitle, points, authPanel, menuGrid, reconnectHint, createModeOverlay);
+  }
   shell.append(artWrap, vignette, frost, card);
   ctx.root.append(shell);
 }
@@ -530,7 +730,7 @@ function renderMenu(ctx: AppContext): void {
 
 function renderLobby(
   ctx: AppContext,
-  opponentType: 'HUMAN' | 'BOT',
+  opponentType: LobbyMode,
   initialLobby: MultiplayerLobbyState | null = null,
   initialState: GameState | null = null,
 ): void {
@@ -549,11 +749,12 @@ function renderLobby(
 
   const roomInfo = document.createElement('p');
   roomInfo.className = 'subtle';
-  roomInfo.textContent = `Room Code: ${ctx.roomCode}`;
+  roomInfo.textContent = opponentType === 'HUMAN' ? `Room Code: ${ctx.roomCode}` : `Mode: ${opponentType === 'BOT' ? 'Play vs Computer' : 'Solo'}`;
 
   const inviteButton = createButton('Copy Invite Link', () => {
     void navigator.clipboard.writeText(buildInviteLink(ctx.roomCode));
   });
+  inviteButton.style.display = opponentType === 'HUMAN' ? 'inline-flex' : 'none';
 
   const slotPanel = document.createElement('div');
   slotPanel.className = 'pixel-panel';
@@ -568,15 +769,16 @@ function renderLobby(
   const opponentSlot = document.createElement('div');
   opponentSlot.textContent = opponentType === 'BOT'
     ? 'Red: Ice Bot (Ready)'
-    : 'Red: Waiting for player...';
-  opponentSlot.style.color = 'var(--red)';
+    : opponentType === 'NONE'
+      ? 'Solo: No opponent'
+      : 'Red: Waiting for player...';
+  opponentSlot.style.color = opponentType === 'NONE' ? 'var(--ui-text)' : 'var(--red)';
 
   const lobbyStatus = document.createElement('p');
   lobbyStatus.className = 'subtle';
-  lobbyStatus.textContent =
-    opponentType === 'BOT'
-      ? 'Toggle Ready then start the match.'
-      : 'Waiting for both players to ready up.';
+  lobbyStatus.textContent = opponentType === 'HUMAN'
+    ? 'Waiting for both players to ready up.'
+    : 'Toggle Ready then start the match.';
 
   slotPanel.append(playerSlot, opponentSlot);
 
@@ -671,7 +873,7 @@ function renderLobby(
           : 'Both players must be ready before host can start.';
     }
 
-    startButton.disabled = opponentType === 'BOT' ? !isReady : !canStartAsHost;
+    startButton.disabled = opponentType === 'HUMAN' ? !canStartAsHost : !isReady;
     if (opponentType === 'HUMAN') {
       startButton.textContent = session?.playerId === 'P1' ? 'Start Match' : 'Waiting for Host';
       if (nextLobby.disconnectedPlayerId) {
@@ -715,7 +917,7 @@ function renderLobby(
   };
 
   const readyButton = createButton('Toggle Ready', () => {
-    if (opponentType === 'BOT') {
+    if (opponentType !== 'HUMAN') {
       isReady = !isReady;
       playerSlot.textContent = `Blue: ${ctx.playerName || 'Player'} (${isReady ? 'Ready' : 'Not Ready'})`;
       startButton.disabled = !isReady;
@@ -754,7 +956,7 @@ function renderLobby(
   });
 
   const startButton = createButton('Start Match', () => {
-    if (opponentType === 'BOT') {
+    if (opponentType !== 'HUMAN') {
       if (!isReady) {
         return;
       }
@@ -788,7 +990,7 @@ function renderLobby(
           startButton.disabled = false;
         }
       });
-  }, opponentType === 'BOT');
+  }, opponentType !== 'HUMAN');
 
   const backButton = createButton('Back', () => {
     disposed = true;
@@ -801,16 +1003,16 @@ function renderLobby(
   shell.append(card);
   ctx.root.append(shell);
 
-  const reconnectHint = document.createElement('p');
-  reconnectHint.className = 'subtle';
-  if (disconnectBackoffMs > 0) {
-    reconnectHint.textContent = `Disconnected players may reconnect for ${disconnectBackoffMs / 1000}s before forfeit.`;
-  } else {
-    reconnectHint.textContent = 'Reconnect handling enabled for active rooms.';
-  }
-  card.append(reconnectHint);
-
   if (opponentType === 'HUMAN') {
+    const reconnectHint = document.createElement('p');
+    reconnectHint.className = 'subtle';
+    if (disconnectBackoffMs > 0) {
+      reconnectHint.textContent = `Disconnected players may reconnect for ${disconnectBackoffMs / 1000}s before forfeit.`;
+    } else {
+      reconnectHint.textContent = 'Reconnect handling enabled for active rooms.';
+    }
+    card.append(reconnectHint);
+
     if (!session) {
       alert('Multiplayer session missing. Returning to menu.');
       renderMenu(ctx);
@@ -829,11 +1031,13 @@ function renderLobby(
 
 function renderGame(
   ctx: AppContext,
-  opponentType: 'HUMAN' | 'BOT',
+  opponentType: LobbyMode,
   multiplayerSession: MultiplayerSession | null = null,
   initialState: GameState | null = null,
 ): void {
   clearRoot(ctx.root);
+  const gameMode = gameModeFromLobbyMode(opponentType);
+  const localPlayerId = multiplayerSession?.playerId ?? 'P1';
 
   const shell = document.createElement('div');
   shell.className = 'app-shell game-shell';
@@ -843,6 +1047,7 @@ function renderGame(
     humanPlayerName: ctx.playerName,
     roomCode: multiplayerSession?.roomCode ?? ctx.roomCode,
     opponentType,
+    gameMode,
     configMode: currentConfigMode(),
     multiplayerSession: multiplayerSession ?? undefined,
     initialState,
@@ -850,7 +1055,21 @@ function renderGame(
       runtime.destroy();
       ctx.runtime = null;
       ctx.multiplayerSession = null;
-      renderEnd(ctx, outcome.winnerName ?? null, outcome.reason);
+      const shouldRecordProgress =
+        outcome.reason === 'Match ended' ||
+        outcome.reason === 'Draw by tie' ||
+        gameMode === 'SOLO';
+
+      if (ctx.playerName && shouldRecordProgress) {
+        recordGameResult({
+          username: ctx.playerName,
+          mode: gameMode,
+          playerId: localPlayerId,
+          winnerId: outcome.winnerId,
+          playerMoney: outcome.playerMoney,
+        });
+      }
+      renderEnd(ctx, outcome, gameMode);
     },
   });
 
@@ -859,7 +1078,7 @@ function renderGame(
   ctx.root.append(shell);
 }
 
-function renderEnd(ctx: AppContext, winnerName: string | null, reason: string): void {
+function renderEnd(ctx: AppContext, outcome: RuntimeOutcome, gameMode: GameMode): void {
   clearRoot(ctx.root);
 
   const shell = document.createElement('div');
@@ -871,17 +1090,27 @@ function renderEnd(ctx: AppContext, winnerName: string | null, reason: string): 
   const title = document.createElement('h2');
   title.className = 'title';
   title.style.fontSize = '34px';
-  title.textContent = winnerName ? `${winnerName} Wins` : 'Draw';
+  if (gameMode === 'SOLO') {
+    title.textContent = `Solo Score: $${outcome.playerMoney}c`;
+  } else {
+    title.textContent = outcome.winnerName ? `${outcome.winnerName} Wins` : 'Draw';
+  }
 
   const details = document.createElement('p');
   details.className = 'subtle';
-  details.textContent = `Reason: ${reason}`;
+  details.textContent = `Reason: ${outcome.reason}`;
+
+  const rewards = document.createElement('p');
+  rewards.className = 'subtle';
+  rewards.textContent = gameMode === 'SOLO'
+    ? `Solo mode does not convert money into Ice Coins. Final money: $${outcome.playerMoney}c.`
+    : `Converted $${outcome.playerMoney}c into Ice Coins for your account.`;
 
   const backButton = createButton('Return to Menu', () => {
     renderMenu(ctx);
   });
 
-  card.append(title, details, backButton);
+  card.append(title, details, rewards, backButton);
   shell.append(card);
   ctx.root.append(shell);
 }

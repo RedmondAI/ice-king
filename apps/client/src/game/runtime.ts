@@ -93,21 +93,21 @@ function formatMmSs(ms: number): string {
   return `${minutes}:${rem}`;
 }
 
-function formatOutcome(state: GameState): RuntimeOutcome {
+function formatOutcome(state: GameState, playerId: string): RuntimeOutcome {
   const winnerId = state.match.winnerId;
-  if (!winnerId) {
-    return { winnerName: null, reason: 'Draw by tie' };
-  }
-  const winner = state.players[winnerId];
+  const winner = winnerId ? state.players[winnerId] : null;
   return {
-    winnerName: winner?.name ?? winnerId,
-    reason: 'Match ended',
+    winnerName: winner ? winner.name : null,
+    winnerId: winnerId ?? null,
+    reason: winnerId ? 'Match ended' : 'Draw by tie',
+    playerMoney: state.players[playerId]?.money ?? 0,
   };
 }
 
 export class GameRuntime {
   private readonly mount: HTMLElement;
   private readonly opts: RuntimeInit;
+  private readonly gameMode: RuntimeInit['gameMode'];
   private readonly gameLayer: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly chatRail: HTMLDivElement | null;
@@ -161,6 +161,7 @@ export class GameRuntime {
 
   constructor(options: RuntimeInit) {
     this.opts = options;
+    this.gameMode = options.gameMode;
     this.mount = options.mount;
 
     this.gameLayer = document.createElement('div');
@@ -200,6 +201,26 @@ export class GameRuntime {
             name: 'Player 2',
             color: 'RED',
             controller: 'HUMAN',
+          },
+        ],
+      });
+    } else if (options.opponentType === 'NONE') {
+      this.engine = new GameEngine({
+        seed: `seed-${Date.now().toString(36)}`,
+        configMode: options.configMode,
+        botControlMode: 'EXTERNAL',
+        players: [
+          {
+            id: 'P1',
+            name: options.humanPlayerName,
+            color: 'BLUE',
+            controller: 'HUMAN',
+          },
+          {
+            id: 'P2',
+            name: 'No Rival',
+            color: 'RED',
+            controller: 'BOT',
           },
         ],
       });
@@ -316,6 +337,7 @@ export class GameRuntime {
       this.sideRail,
       this.handleSkipSummerVote,
     );
+    this.hud.setOpponentStatsVisible(options.opponentType !== 'NONE');
 
     this.minimap = new MinimapController(this.minimapCanvas, (x, y) => {
       this.dispatchAction({
@@ -907,7 +929,9 @@ export class GameRuntime {
     }
     this.opts.onExit({
       winnerName: null,
+      winnerId: null,
       reason,
+      playerMoney: this.engine.getState().players[this.playerId]?.money ?? 0,
     });
   }
 
@@ -1296,10 +1320,14 @@ export class GameRuntime {
   private updateHud(): void {
     const split = this.engine.getPlayerStorage(this.playerId);
     const state = this.engine.getState();
-    const opponentId = Object.keys(state.players).find((id) => id !== this.playerId) ?? null;
+    const opponentId = this.opts.opponentType === 'NONE'
+      ? null
+      : Object.keys(state.players).find((id) => id !== this.playerId) ?? null;
     const opponentSplit = opponentId ? this.engine.getPlayerStorage(opponentId) : null;
     const runtimeMode = this.multiplayerSession
       ? 'MULTIPLAYER'
+      : this.gameMode === 'SOLO'
+        ? 'SOLO'
       : this.useExternalBot
         ? 'LLM_EXTERNAL'
         : 'INTERNAL_HEURISTIC';
@@ -1372,7 +1400,7 @@ export class GameRuntime {
 
     if (this.engine.getState().match.ended) {
       this.running = false;
-      const outcome = formatOutcome(this.engine.getState());
+      const outcome = formatOutcome(this.engine.getState(), this.playerId);
       this.opts.onExit(outcome);
     }
   }
@@ -1508,6 +1536,8 @@ export class GameRuntime {
           bot: {
             mode: this.multiplayerSession
               ? 'MULTIPLAYER'
+              : this.gameMode === 'SOLO'
+                ? 'SOLO'
               : this.useExternalBot
                 ? 'LLM_EXTERNAL'
                 : 'INTERNAL_HEURISTIC',

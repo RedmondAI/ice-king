@@ -27,13 +27,18 @@ Last updated: 2026-02-26
 
 ## Runtime Flow
 1. `bootstrapApp` renders splash on root every visit.
-2. Splash acts as first menu surface with local account auth (username/password create+login) and menu controls (Create/Join/Play vs Computer/How to Play/Settings).
-3. Lobby is rendered for either `Play vs Computer` or `Create/Join` multiplayer room flow.
-4. `GameRuntime` runs either:
-- local play-vs-computer engine, or
+2. Splash acts as first menu surface with local account auth (username/password create+login), account stats, and menu controls (`Create Game`, `Join Game`, `How to Play`, `Settings`).
+3. `Create Game` opens a mode-picker popup (`Play vs Computer`, `Play Online`, `Solo`, plus locked placeholders for `Friendly`, `Team`, `Ice Wars`).
+4. Lobby is rendered for local (`Play vs Computer`, `Solo`) or online multiplayer room flow.
+5. `GameRuntime` runs either:
+- local play-vs-computer engine,
+- local solo engine (no active bot actions), or
 - multiplayer-synced state via `/api/multiplayer/*` room endpoints.
   - lobby polls `/api/multiplayer/state`, ready/start uses `ready` and `start`, gameplay actions post to `/api/multiplayer/action`, and chat posts to `/api/multiplayer/chat`.
-5. Frame loop:
+6. Match end writes account progression:
+- non-solo modes convert final money into Ice Coins;
+- stats counters update (games, wins/losses/draws, solo metrics).
+7. Frame loop:
 - Input handling (keys, map drag, minimap drag, two-step click tile behavior).
 - Fixed-step engine tick (local mode) or remote state sync poll (multiplayer mode).
 - External bot director update (when enabled).
@@ -71,6 +76,7 @@ Last updated: 2026-02-26
 - DOM overlay layer sits above canvas and includes a dedicated right-side control rail that contains:
   - Instructions panel (above Stats; collapsed by default).
   - Stats HUD (collapsible).
+  - Solo mode hides the opponent-stats subsection.
 - Multiplayer mode also mounts a dedicated left-side chat rail (full stage height) for room chat.
 - Chat composer includes an emoji-picker popup for quick emoji insertion.
 - Tile action popup host (small action menu anchored above clicked tiles, shown on second click).

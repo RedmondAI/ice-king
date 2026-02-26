@@ -270,6 +270,81 @@ input {
   color: #8f2323;
 }
 
+.account-stats {
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.account-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 14px;
+}
+
+.account-stats-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+  line-height: 1.4;
+  padding-bottom: 2px;
+  border-bottom: 1px dashed rgba(107, 79, 42, 0.35);
+}
+
+.mode-picker-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(4, 10, 18, 0.72);
+  z-index: 4;
+}
+
+.mode-picker-card {
+  width: min(640px, 92vw);
+  max-height: min(80vh, 760px);
+  overflow-y: auto;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.mode-picker-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mode-picker-item {
+  border: 2px solid rgba(107, 79, 42, 0.35);
+  background: rgba(255, 250, 238, 0.7);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.mode-picker-option {
+  width: 100%;
+  text-align: left;
+}
+
+.mode-picker-option-locked {
+  filter: saturate(0.5);
+}
+
+.mode-picker-description {
+  font-size: 10px;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.mode-picker-close {
+  justify-self: end;
+  min-width: 140px;
+}
+
 .game-shell {
   width: 100%;
   height: 100%;

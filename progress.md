@@ -2,6 +2,52 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-26 (Milestone Update 38)
+- Added Create Game mode picker popup on splash:
+  - `Create Game` now opens a modal with options:
+    - `1: Play vs Computer`
+    - `2: Play Online`
+    - `3: Solo`
+    - `4: Friendly (Locked, 50 Ice Coins)`
+    - `5: Team (Locked, 80 Ice Coins)`
+    - `6: Ice Wars (Locked, 80 Ice Coins)`
+  - Removed standalone `Play vs Computer` button from the landing menu.
+  - `Enter` on signed-in splash now opens the mode picker.
+- Added local `Solo` mode runtime path:
+  - lobby supports `Solo` start flow.
+  - runtime boots a no-active-bot local engine variant for solo runs.
+  - in-game opponent stats rail is hidden for solo.
+- Added persistent account progression + stats:
+  - account storage now includes `iceCoins`, game outcomes, solo counters, and all-time earnings.
+  - non-solo matches convert final player money into `Ice Coins` on match end.
+  - solo matches do not convert money to coins and instead track solo run metrics.
+  - splash now shows account stats panel for signed-in users.
+- Updated Playwright multiplayer UI regression for mode picker:
+  - host now selects `2: Play Online` after clicking `Create Game`.
+- Synced docs for mode picker, solo mode, and account coin/stat behavior.
+- Files updated:
+  - `apps/client/src/app/bootstrap.ts`
+  - `apps/client/src/app/auth.ts`
+  - `apps/client/src/game/runtime.ts`
+  - `apps/client/src/game/types.ts`
+  - `apps/client/src/game/ui/hud.ts`
+  - `apps/client/src/styles.css`
+  - `scripts/multiplayer-ui-regression.spec.cjs`
+  - `GAME_SPEC.md`
+  - `ARCHITECTURE.md`
+  - `progress.md`
+- Validation:
+  - `develop-web-game` Playwright client run via `web_game_playwright_client.js` -> pass artifact captured (`output/web-game/menu-mode-picker/shot-0.png`)
+  - custom Playwright UI checks:
+    - mode picker options visible and locked entries disabled
+    - solo end screen + no-coin transfer behavior
+    - play-vs-computer end screen + coin transfer behavior
+    - account stats persistence after return to splash
+    - no console errors in exercised flow
+  - `npm run test` -> pass
+  - `npm run build` -> pass
+  - `npm run test:multiplayer:ui` -> pass (`1 passed`)
+
 ## 2026-02-26 (Milestone Update 37)
 - Added splash-level local account auth (username/password) for client entry flow:
   - new auth module with localStorage-backed account creation/login/logout.

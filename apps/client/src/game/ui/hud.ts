@@ -42,6 +42,7 @@ export class HudLayer {
   private readonly opponentStatRows: Record<string, HTMLSpanElement>;
   private collapsed = false;
   private opponentCollapsed = false;
+  private opponentVisible = true;
   private instructionsCollapsed = true;
   private debugEnabled = false;
   private toasts: ToastItem[] = [];
@@ -288,6 +289,16 @@ export class HudLayer {
     this.debugOverlay.style.display = visible ? 'block' : 'none';
   }
 
+  setOpponentStatsVisible(visible: boolean): void {
+    this.opponentVisible = visible;
+    this.opponentHead.style.display = visible ? 'flex' : 'none';
+    this.opponentHudBody.style.display = visible
+      ? this.opponentCollapsed
+        ? 'none'
+        : 'grid'
+      : 'none';
+  }
+
   updateStats(
     state: GameState,
     playerId: string,
@@ -333,15 +344,23 @@ export class HudLayer {
     setRows(this.statRows, player, extra);
     setRows(this.opponentStatRows, opponent, opponentExtra);
 
-    if (opponent?.color === 'RED') {
-      this.opponentHead.style.borderColor = 'var(--red)';
-      this.opponentHudBody.style.borderColor = 'var(--red)';
-    } else if (opponent?.color === 'BLUE') {
-      this.opponentHead.style.borderColor = 'var(--blue)';
-      this.opponentHudBody.style.borderColor = 'var(--blue)';
+    if (this.opponentVisible) {
+      this.opponentHead.style.display = 'flex';
+      this.opponentHudBody.style.display = this.opponentCollapsed ? 'none' : 'grid';
+
+      if (opponent?.color === 'RED') {
+        this.opponentHead.style.borderColor = 'var(--red)';
+        this.opponentHudBody.style.borderColor = 'var(--red)';
+      } else if (opponent?.color === 'BLUE') {
+        this.opponentHead.style.borderColor = 'var(--blue)';
+        this.opponentHudBody.style.borderColor = 'var(--blue)';
+      } else {
+        this.opponentHead.style.borderColor = 'var(--ui-border)';
+        this.opponentHudBody.style.borderColor = 'var(--ui-border)';
+      }
     } else {
-      this.opponentHead.style.borderColor = 'var(--ui-border)';
-      this.opponentHudBody.style.borderColor = 'var(--ui-border)';
+      this.opponentHead.style.display = 'none';
+      this.opponentHudBody.style.display = 'none';
     }
 
     const canVoteToSkipSummer = Boolean(

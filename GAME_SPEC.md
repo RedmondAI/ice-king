@@ -4,8 +4,12 @@ Last updated: 2026-02-26
 
 ## Current Playable Mode
 - Supported modes:
-- `Play vs Computer` (local client-first loop).
-- `Create Game` / `Join Game` (two human players over `/api/multiplayer/*` room service).
+- `Create Game` mode picker includes:
+  - `Play vs Computer` (local client-first loop vs bot).
+  - `Play Online` (two human players over `/api/multiplayer/*` room service).
+  - `Solo` (single-player run with no active computer opponent).
+  - `Friendly`, `Team`, `Ice Wars` are visible but locked (coin-gated placeholders).
+- `Join Game` remains available for joining existing online room codes.
 - Multiplayer authority currently runs in the Vite host process (in-memory, no persistent backend yet).
 
 ## Multiplayer Flow (Current)
@@ -37,7 +41,15 @@ Last updated: 2026-02-26
   - `password` (minimum `4` characters).
 - No email is used.
 - Account records are stored in browser `localStorage` for local/dev play.
-- Logged-in username is used as the player name for `Play vs Computer` and multiplayer create/join.
+- Logged-in username is used as the player name for `Play vs Computer`, `Solo`, and multiplayer create/join.
+- Account stats are tracked in local storage and shown on splash when logged in:
+  - `Ice Coins`
+  - `Games Played`, `Wins`, `Losses`, `Draws`
+  - `Solo Runs`, `Best Solo`
+  - all-time earned counters.
+- End-of-game rewards:
+  - non-solo modes convert final player money directly into `Ice Coins`;
+  - `Solo` does not convert money to coins.
 
 ## Core Loop
 - Expand by buying tiles.
@@ -124,7 +136,8 @@ Last updated: 2026-02-26
 ## UI Behavior Rules
 - Root (`http://localhost:5173/`) always opens splash screen.
 - Splash includes account controls (create/login/logout) plus the main menu buttons.
-- `Enter` on splash starts Play-vs-Computer when logged in.
+- `Create Game` opens a mode picker popup on splash.
+- `Enter` on splash opens the Create Game mode picker when logged in.
 - Instructions panel:
 - Above Stats, collapsed by default.
 - Provides a themed summary of the rules and controls.

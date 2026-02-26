@@ -165,6 +165,7 @@ test('multiplayer flow: create, join, ready, start, action', async ({ browser })
 
     await createAccount(host, 'Host CI', 'pass1');
     await host.getByRole('button', { name: 'Create Game' }).click();
+    await host.getByRole('button', { name: '2: Play Online' }).click();
 
     await expect(host.getByRole('heading', { name: 'Lobby' })).toBeVisible();
     const roomCode = await readLobbyRoomCode(host);
