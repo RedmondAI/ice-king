@@ -114,6 +114,7 @@ interface MultiplayerLobbySnapshot {
   roomCode: string;
   started: boolean;
   hostPlayerId: MultiplayerPlayerId;
+  mode: 'PLAY_ONLINE' | 'FRIENDLY';
   disconnectedPlayerId: string | null;
   pausedAtMs: number | null;
   timeoutAtMs: number | null;
@@ -127,6 +128,7 @@ interface MultiplayerRoom {
   roomCode: string;
   configMode: 'PROD' | 'DEV_FAST';
   engine: GameEngine;
+  mode: 'PLAY_ONLINE' | 'FRIENDLY';
   createdAtMs: number;
   updatedAtMs: number;
   lastTickAtMs: number;
@@ -394,6 +396,7 @@ function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
     roomCode: room.roomCode,
     started: room.started,
     hostPlayerId: 'P1',
+    mode: room.mode,
     players: {
       P1: {
         id: p1.id,
@@ -632,6 +635,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
         const playerName = sanitizePlayerName(body.playerName, 'Player 1');
         const configMode = body.configMode === 'DEV_FAST' ? 'DEV_FAST' : 'PROD';
         const preferredRoomCode = normalizeRoomCode(String(body.preferredRoomCode ?? ''));
+        const mode = body.mode === 'FRIENDLY' ? 'FRIENDLY' : 'PLAY_ONLINE';
 
         const roomCode = preferredRoomCode || createUniqueRoomCode(rooms);
         if (!roomCode) {
@@ -677,11 +681,18 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
               controller: 'HUMAN',
             },
           ],
+          teamByPlayerId: mode === 'FRIENDLY'
+            ? {
+                P1: 'FRIENDLY',
+                P2: 'FRIENDLY',
+              }
+            : undefined,
         });
 
         const room: MultiplayerRoom = {
           roomCode,
           configMode,
+          mode,
           engine,
           createdAtMs: nowMs,
           updatedAtMs: nowMs,

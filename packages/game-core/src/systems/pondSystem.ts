@@ -1,6 +1,6 @@
 import type { GameConfig } from '@ice-king/config';
 import type { ActionResult, GameState } from '@ice-king/shared';
-import { addLog, createId, getTile, inBounds } from '../helpers';
+import { addLog, createId, getTile, inBounds, isTileOwnedByPlayerOrTeammate } from '../helpers';
 
 function harvestDurationMs(config: GameConfig): number {
   return Math.max(1, config.timing.pondHarvestDurationMs);
@@ -36,7 +36,7 @@ export function startPondHarvest(
     return { ok: false, code: 'INVALID_ACTION', message: 'Pond harvest can only start on pond tiles.' };
   }
 
-  if (tile.ownerId !== playerId) {
+  if (!isTileOwnedByPlayerOrTeammate(state, tile.ownerId, playerId)) {
     return { ok: false, code: 'NOT_OWNER', message: 'You must own this pond tile to harvest it.' };
   }
 
@@ -111,7 +111,7 @@ export function claimPondHarvest(
   }
 
   const job = state.ponds.find((entry) => entry.id === pondJobId);
-  if (!job || job.ownerId !== playerId) {
+  if (!job || !isTileOwnedByPlayerOrTeammate(state, job.ownerId, playerId)) {
     return { ok: false, code: 'NOT_CLAIMABLE', message: 'Pond job not found for this player.' };
   }
 

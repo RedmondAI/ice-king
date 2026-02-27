@@ -20,6 +20,7 @@ export interface CreateInitialStateOptions {
   config: GameConfig;
   players: [InitialPlayerInput, InitialPlayerInput];
   nowMs?: number;
+  teamByPlayerId?: Record<string, string>;
 }
 
 function createPlayerState(input: InitialPlayerInput, config: GameConfig): PlayerState {
@@ -94,6 +95,7 @@ export function createInitialState(options: CreateInitialStateOptions): GameStat
     width: generated.width,
     height: generated.height,
     tiles: generated.tiles,
+    teamByPlayerId: options.teamByPlayerId ?? Object.fromEntries(playerInputs.map((input) => [input.id, input.id])),
     players: playerStates,
     playerOrder: playerInputs.map((input) => input.id),
     summerSkipVotesByPlayerId,

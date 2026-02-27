@@ -229,3 +229,132 @@ test('multiplayer flow: create, join, ready, start, action', async ({ browser })
     await guestContext.close();
   }
 });
+
+test('solo flow: create, ready, start, action', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+
+  await page.addInitScript(() => localStorage.clear());
+
+  try {
+    await page.goto(BASE_URL);
+    await createAccount(page, 'Solo CI', 'pass1');
+
+    await page.getByRole('button', { name: 'Create Game' }).click();
+    await page.getByRole('button', { name: '3: Solo' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+    await expect(page.getByText('Mode: Solo')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Toggle Ready' }).click();
+
+    const startButton = page.getByRole('button', { name: 'Start Match' });
+    await expect(startButton).toBeEnabled();
+    await startButton.click();
+
+    await expect(page.locator('#game-canvas')).toBeVisible();
+
+    const before = await readRenderState(page);
+    if (!before) {
+      throw new Error('render_game_to_text unavailable in solo runtime.');
+    }
+
+    await page.click('#game-canvas');
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(700);
+    await page.keyboard.up('ArrowRight');
+
+    const after = await readRenderState(page);
+    if (!after) {
+      throw new Error('render_game_to_text unavailable after solo input.');
+    }
+
+    expect(after.mode).toBe('PLAYING');
+    const moved = Math.abs(after.camera.x - before.camera.x) > 0.005;
+    expect(moved).toBeTruthy();
+  } finally {
+    await page.close();
+    await context.close();
+  }
+});
+
+test('friendly flow: create, join, ready, start, action', async ({ browser }) => {
+  const hostContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const guestContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+
+  const host = await hostContext.newPage();
+  const guest = await guestContext.newPage();
+
+  await host.addInitScript(() => localStorage.clear());
+  await guest.addInitScript(() => localStorage.clear());
+
+  try {
+    await host.goto(BASE_URL);
+    await guest.goto(BASE_URL);
+
+    await createAccount(host, 'Friendly Host CI', 'pass1');
+    await host.getByRole('button', { name: 'Create Game' }).click();
+    await host.getByRole('button', { name: /4: Friendly/ }).click();
+
+    await expect(host.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+    const roomCode = await readLobbyRoomCode(host);
+
+    await createAccount(guest, 'Friendly Guest CI', 'pass2');
+
+    const joinDialogHandled = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timed out while waiting for Join Game prompt.'));
+      }, 5000);
+      guest.once('dialog', (dialog) => {
+        clearTimeout(timeout);
+        if (dialog.type() !== 'prompt') {
+          reject(new Error(`Unexpected dialog type: ${dialog.type()}`));
+          return;
+        }
+        void dialog.accept(roomCode).then(resolve).catch(reject);
+      });
+    });
+    await guest.getByRole('button', { name: 'Join Game' }).click();
+    await joinDialogHandled;
+
+    await expect(guest.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+    const guestCode = await readLobbyRoomCode(guest);
+    expect(guestCode).toBe(roomCode);
+
+    await host.getByRole('button', { name: 'Set Ready' }).click();
+    await guest.getByRole('button', { name: 'Set Ready' }).click();
+
+    const startButton = host.getByRole('button', { name: 'Start Match' });
+    await expect(startButton).toBeEnabled();
+    await startButton.click();
+
+    await expect(host.locator('#game-canvas')).toBeVisible();
+    await expect(guest.locator('#game-canvas')).toBeVisible();
+
+    const beforeHost = await readRenderState(host);
+    if (!beforeHost) {
+      throw new Error('render_game_to_text unavailable in friendly host runtime.');
+    }
+
+    await host.click('#game-canvas');
+    await host.keyboard.down('ArrowRight');
+    await host.waitForTimeout(800);
+    await host.keyboard.up('ArrowRight');
+
+    await guest.waitForTimeout(600);
+
+    const afterHost = await readRenderState(host);
+    if (!afterHost) {
+      throw new Error('render_game_to_text unavailable after friendly action.');
+    }
+    expect(afterHost.mode).toBe('PLAYING');
+
+    const moved = Math.abs(afterHost.camera.x - beforeHost.camera.x) > 0.005 || Math.abs(afterHost.camera.y - beforeHost.camera.y) > 0.005;
+    expect(moved).toBeTruthy();
+  } finally {
+    await host.close();
+    await guest.close();
+    await hostContext.close();
+    await guestContext.close();
+  }
+});

@@ -64,3 +64,26 @@ export function playerStorageSplit(
     unrefrigeratedIce,
   };
 }
+
+export function playerTeam(state: Pick<GameState, 'teamByPlayerId'>, playerId: string): string {
+  return state.teamByPlayerId?.[playerId] ?? playerId;
+}
+
+export function arePlayersTeammates(
+  state: Pick<GameState, 'teamByPlayerId'>,
+  playerAId: string,
+  playerBId: string,
+): boolean {
+  return playerTeam(state, playerAId) === playerTeam(state, playerBId);
+}
+
+export function isTileOwnedByPlayerOrTeammate(
+  state: Pick<GameState, 'teamByPlayerId'>,
+  ownerId: string | null,
+  playerId: string,
+): boolean {
+  if (ownerId === null) {
+    return false;
+  }
+  return ownerId === playerId || arePlayersTeammates(state, ownerId, playerId);
+}

@@ -1,6 +1,13 @@
 import type { GameConfig } from '@ice-king/config';
 import type { ActionResult, GameState, NetWorthBreakdown, TileState } from '@ice-king/shared';
-import { addLog, getTile, inBounds, playerStorageSplit, roundDown } from '../helpers';
+import {
+  addLog,
+  getTile,
+  inBounds,
+  isTileOwnedByPlayerOrTeammate,
+  playerStorageSplit,
+  roundDown,
+} from '../helpers';
 
 function assertPlayer(state: GameState, playerId: string): ActionResult | null {
   if (!state.players[playerId]) {
@@ -34,7 +41,7 @@ export function buyUnownedTile(
     return { ok: false, code: 'INVALID_ACTION', message: 'Border tiles cannot be purchased.' };
   }
 
-  if (tile.ownerId === playerId) {
+  if (tile.ownerId !== null && isTileOwnedByPlayerOrTeammate(state, tile.ownerId, playerId)) {
     return { ok: false, code: 'ALREADY_OWNER', message: 'Tile is already owned by this player.' };
   }
 
@@ -104,7 +111,7 @@ export function buyOwnedTile(
     };
   }
 
-  if (tile.ownerId === playerId) {
+  if (tile.ownerId !== null && isTileOwnedByPlayerOrTeammate(state, tile.ownerId, playerId)) {
     return { ok: false, code: 'ALREADY_OWNER', message: 'Tile is already owned by this player.' };
   }
 
@@ -151,8 +158,8 @@ export function buyOwnedTile(
   };
 }
 
-export function canBuildOnTile(tile: TileState, playerId: string): boolean {
-  if (tile.ownerId !== playerId) {
+export function canBuildOnTile(state: GameState, tile: TileState, playerId: string): boolean {
+  if (!isTileOwnedByPlayerOrTeammate(state, tile.ownerId, playerId)) {
     return false;
   }
   return tile.type === 'GRASS' || tile.type === 'FOREST';

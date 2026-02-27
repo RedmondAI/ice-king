@@ -141,6 +141,7 @@ export interface GameState {
   tiles: TileState[];
   players: Record<string, PlayerState>;
   playerOrder: string[];
+  teamByPlayerId?: Record<string, string>;
   summerSkipVotesByPlayerId: Record<string, boolean>;
   bots: Record<string, BotControllerState>;
   season: SeasonState;

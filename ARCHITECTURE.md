@@ -28,7 +28,7 @@ Last updated: 2026-02-26
 ## Runtime Flow
 1. `bootstrapApp` renders splash on root every visit.
 2. Splash acts as first menu surface with local account auth (username/password create+login), account stats, and menu controls (`Create Game`, `Join Game`, `How to Play`, `Settings`).
-3. `Create Game` opens a mode-picker popup (`Play vs Computer`, `Play Online`, `Solo`, plus locked placeholders for `Friendly`, `Team`, `Ice Wars`).
+3. `Create Game` opens a mode-picker popup (`Play vs Computer`, `Play Online`, `Solo`, `Friendly`, plus locked placeholders for `Team`, `Ice Wars`).
 4. Lobby is rendered for local (`Play vs Computer`, `Solo`) or online multiplayer room flow.
 5. `GameRuntime` runs either:
 - local play-vs-computer engine,
@@ -37,7 +37,7 @@ Last updated: 2026-02-26
   - lobby polls `/api/multiplayer/state`, ready/start uses `ready` and `start`, gameplay actions post to `/api/multiplayer/action`, and chat posts to `/api/multiplayer/chat`.
 6. Match end writes account progression:
 - non-solo modes convert final money into Ice Coins;
-- stats counters update (games, wins/losses/draws, solo metrics).
+- `Friendly` and `Play Online` run with multiplayer sessions and shared land ownership rules.
 7. Frame loop:
 - Input handling (keys, map drag, minimap drag, two-step click tile behavior).
 - Fixed-step engine tick (local mode) or remote state sync poll (multiplayer mode).

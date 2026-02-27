@@ -139,6 +139,21 @@ export class GameRuntime {
     lastOutputTokens: 0,
   };
 
+  private isTileOwnedByPlayerOrTeammate(ownerId: string | null): boolean {
+    if (!ownerId) {
+      return false;
+    }
+    if (ownerId === this.playerId) {
+      return true;
+    }
+    const state = this.engine.getState();
+    const teamByPlayerId = state.teamByPlayerId;
+    if (!teamByPlayerId) {
+      return false;
+    }
+    return teamByPlayerId[ownerId] === teamByPlayerId[this.playerId];
+  }
+
   private botDirector: BotDirector | null = null;
   private hoveredTile: { x: number; y: number } | null = null;
   private selectedTile: { x: number; y: number } | null = null;
@@ -657,7 +672,7 @@ export class GameRuntime {
     const cameraOffsetY = Math.round((viewport.cameraY - cameraTileY) * TILE_SIZE);
 
     for (const pondJob of state.ponds) {
-      if (pondJob.ownerId !== this.playerId || pondJob.status !== 'CLAIMABLE') {
+      if (!this.isTileOwnedByPlayerOrTeammate(pondJob.ownerId) || pondJob.status !== 'CLAIMABLE') {
         continue;
       }
 
@@ -693,7 +708,9 @@ export class GameRuntime {
       if (result.ok) {
         const job = this.engine
           .getState()
-          .ponds.find((entry) => entry.id === pondJob.id && entry.ownerId === this.playerId);
+          .ponds.find(
+            (entry) => entry.id === pondJob.id && this.isTileOwnedByPlayerOrTeammate(entry.ownerId),
+          );
         if (job) {
           const point = this.tileCenterToOverlayPoint(job.pondX, job.pondY);
           this.spawnFlyingIce(point.x, point.y);
@@ -723,7 +740,9 @@ export class GameRuntime {
     if (result.ok && action.type === 'pond.harvest.claim') {
       const job = this.engine
         .getState()
-        .ponds.find((entry) => entry.id === action.pondJobId && entry.ownerId === this.playerId);
+        .ponds.find(
+          (entry) => entry.id === action.pondJobId && this.isTileOwnedByPlayerOrTeammate(entry.ownerId),
+        );
       if (job) {
         const point = this.tileCenterToOverlayPoint(job.pondX, job.pondY);
         this.spawnFlyingIce(point.x, point.y);
@@ -778,7 +797,11 @@ export class GameRuntime {
   private mapActionIdToAction(actionId: string, x: number, y: number): GameAction | null {
     const state = this.engine.getState();
     const ownClaim = state.ponds.find(
-      (entry) => entry.ownerId === this.playerId && entry.pondX === x && entry.pondY === y && entry.status === 'CLAIMABLE',
+      (entry) =>
+        this.isTileOwnedByPlayerOrTeammate(entry.ownerId) &&
+        entry.pondX === x &&
+        entry.pondY === y &&
+        entry.status === 'CLAIMABLE',
     );
 
     switch (actionId) {
@@ -1173,13 +1196,13 @@ export class GameRuntime {
 
     const hasPendingPondJob = tile.type === 'POND' && state.ponds.some(
       (entry) =>
-        entry.ownerId === this.playerId &&
+        this.isTileOwnedByPlayerOrTeammate(entry.ownerId) &&
         entry.pondX === tile.x &&
         entry.pondY === tile.y &&
         entry.status !== 'CLAIMED',
     );
 
-    if (tile.ownerId === this.playerId && tile.type === 'POND' && !hasPendingPondJob) {
+    if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'POND' && !hasPendingPondJob) {
       if (!isSummer) {
         this.hud.setPondPopup({
           text: `Spend $1c to start a ${formatMmSs(
@@ -1201,19 +1224,19 @@ export class GameRuntime {
       actions.push({ id: 'tile-buy', label: 'Buy Tile ($1c)' });
     }
 
-    if (tile.ownerId && tile.ownerId !== this.playerId) {
+    if (tile.ownerId && !this.isTileOwnedByPlayerOrTeammate(tile.ownerId)) {
       actions.push({ id: 'tile-buyout', label: `Buyout Tile ($${tile.currentPrice + 1}c)` });
     }
 
-    if (tile.ownerId === this.playerId && (tile.type === 'GRASS' || tile.type === 'FOREST')) {
+    if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && (tile.type === 'GRASS' || tile.type === 'FOREST')) {
       actions.push({ id: 'build-factory', label: 'Build Factory (2 ice + $2c)' });
       actions.push({ id: 'build-pond', label: 'Build Man-Made Pond (1 ice + $2c)' });
     }
 
-    if (tile.ownerId === this.playerId && tile.type === 'POND') {
+    if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'POND') {
       const pondJob = state.ponds.find(
         (entry) =>
-          entry.ownerId === this.playerId && entry.pondX === tile.x && entry.pondY === tile.y,
+          this.isTileOwnedByPlayerOrTeammate(entry.ownerId) && entry.pondX === tile.x && entry.pondY === tile.y,
       );
 
       if (pondJob?.status === 'ACTIVE') {
@@ -1221,7 +1244,7 @@ export class GameRuntime {
       }
       const claimable = state.ponds.some(
         (entry) =>
-          entry.ownerId === this.playerId &&
+          this.isTileOwnedByPlayerOrTeammate(entry.ownerId) &&
           entry.pondX === tile.x &&
           entry.pondY === tile.y &&
           entry.status === 'CLAIMABLE',
@@ -1231,7 +1254,7 @@ export class GameRuntime {
       }
     }
 
-    if (tile.ownerId === this.playerId && tile.type === 'HOUSE') {
+    if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'HOUSE') {
       if (!isSummer) {
         warningText = 'you have to waint until summer to sell the ice';
       }
@@ -1240,12 +1263,12 @@ export class GameRuntime {
       actions.push({ id: 'sell-blue-1', label: 'Sell 1 Blue Ice ($8c)', disabled: !isSummer });
     }
 
-    if (tile.ownerId === this.playerId && tile.type === 'FACTORY') {
+    if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'FACTORY') {
       actions.push({ id: 'craft-fridge', label: 'Craft Refrigerator (2 ice + $2c / 2m)' });
       actions.push({ id: 'craft-blue', label: 'Craft Blue Ice (2 ice + $2c / 2m)' });
     }
 
-    if (tile.ownerId === this.playerId && tile.type === 'TRAIN') {
+    if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'TRAIN') {
       actions.push({ id: 'train-sale', label: 'Sell Annual Shipment (3 ice -> $9c)' });
     }
 

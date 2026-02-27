@@ -23,10 +23,13 @@ export interface MultiplayerLobbyPlayerState {
   connected: boolean;
 }
 
+export type MultiplayerGameMode = 'PLAY_ONLINE' | 'FRIENDLY';
+
 export interface MultiplayerLobbyState {
   roomCode: string;
   started: boolean;
   hostPlayerId: MultiplayerPlayerId;
+  mode: MultiplayerGameMode;
   players: {
     P1: MultiplayerLobbyPlayerState;
     P2: MultiplayerLobbyPlayerState | null;
@@ -47,6 +50,7 @@ export interface MultiplayerCreateRequest {
   playerName: string;
   configMode: 'PROD' | 'DEV_FAST';
   preferredRoomCode?: string | null;
+  mode?: MultiplayerGameMode;
 }
 
 export interface MultiplayerJoinRequest {
@@ -227,11 +231,13 @@ export async function createMultiplayerRoom(
   playerName: string,
   configMode: 'PROD' | 'DEV_FAST',
   preferredRoomCode: string | null = null,
+  mode: MultiplayerGameMode = 'PLAY_ONLINE',
 ): Promise<MultiplayerCreateResponse> {
   return postJson<MultiplayerCreateResponse>('/create', {
     playerName,
     configMode,
     preferredRoomCode: preferredRoomCode ? normalizeRoomCode(preferredRoomCode) : null,
+    mode,
   });
 }
 

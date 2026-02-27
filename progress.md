@@ -2,6 +2,26 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-27 (Milestone Update 40)
+- Implemented `Friendly` mode creation from Create Game popup:
+  - added mode-aware lobby mapping from server mode payloads;
+  - `FRIENDLY` rooms now assign a shared team id for land ownership while keeping separate player resources;
+  - `Join Game` and reconnect paths map mode from lobby mode payload instead of assuming local human play.
+- Added Friendly coin gating:
+  - host needs `50` Ice Coins to create a Friendly room;
+  - option is unlocked in menu when funds are sufficient and shown as locked otherwise.
+- Updated lobby behavior for Friendly:
+  - room code, invite link, ready/start flow, and host-only start gating now use shared multiplayer handling for both `PLAY_ONLINE` and `FRIENDLY`.
+- Added Playwright UI regression for Friendly:
+  - host creates Friendly, guest joins via room code, both ready/start, gameplay starts, and minimal action path verifies live game rendering.
+- Updated docs:
+  - `GAME_SPEC.md`
+  - `ARCHITECTURE.md`
+- Validation:
+  - `npm run test` -> pass
+  - `npm run build` -> pass
+  - `npm run test:multiplayer:ui` -> pass
+
 ## 2026-02-26 (Milestone Update 39)
 - Updated new-account defaults:
   - new users now start with `100` Ice Coins.

@@ -8,9 +8,13 @@ Last updated: 2026-02-26
   - `Play vs Computer` (local client-first loop vs bot).
   - `Play Online` (two human players over `/api/multiplayer/*` room service).
   - `Solo` (single-player run with no active computer opponent).
-  - `Friendly`, `Team`, `Ice Wars` are visible but locked (coin-gated placeholders).
+  - `Friendly` (two-player mode with shared land ownership and separate player resources; requires `50` Ice Coins).
+  - `Team` and `Ice Wars` are visible but locked placeholders.
 - `Join Game` remains available for joining existing online room codes.
 - Multiplayer authority currently runs in the Vite host process (in-memory, no persistent backend yet).
+- Ice Coin economy:
+  - new accounts start with `100` Ice Coins.
+  - `Friendly` mode entry consumes `50` Ice Coins from the host at room creation.
 
 ## Multiplayer Flow (Current)
 - Lobby contract:
@@ -48,8 +52,8 @@ Last updated: 2026-02-26
   - `Solo Runs`, `Best Solo`
   - all-time earned counters.
 - End-of-game rewards:
-  - non-solo modes convert final player money directly into `Ice Coins`;
-  - `Solo` does not convert money to coins.
+- non-solo modes convert final player money directly into `Ice Coins`;
+- `Solo` does not convert money to coins.
 
 ## Core Loop
 - Expand by buying tiles.

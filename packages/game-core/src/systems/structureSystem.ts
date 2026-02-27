@@ -2,6 +2,7 @@ import type { GameConfig } from '@ice-king/config';
 import type { ActionResult, CraftKind, GameState } from '@ice-king/shared';
 import { addLog, createId, getTile, inBounds } from '../helpers';
 import { canBuildOnTile } from './economySystem';
+import { isTileOwnedByPlayerOrTeammate } from '../helpers';
 
 const SUMMER_HOUSE_SALE_MESSAGE = 'you have to waint until summer to sell the ice';
 
@@ -34,7 +35,7 @@ function assertOwnedTileType(
   }
 
   const tile = getTile(state, x, y);
-  if (tile.ownerId !== playerId) {
+  if (!isTileOwnedByPlayerOrTeammate(state, tile.ownerId, playerId)) {
     return { ok: false, code: 'NOT_OWNER', message: 'Player must own this tile.' };
   }
 
@@ -63,7 +64,7 @@ export function buildFactory(
 
   const tile = getTile(state, x, y);
   const player = state.players[playerId] as NonNullable<GameState['players'][string]>;
-  if (!canBuildOnTile(tile, playerId)) {
+  if (!canBuildOnTile(state, tile, playerId)) {
     return {
       ok: false,
       code: 'INVALID_ACTION',
@@ -112,7 +113,7 @@ export function buildManMadePond(
 
   const tile = getTile(state, x, y);
   const player = state.players[playerId] as NonNullable<GameState['players'][string]>;
-  if (!canBuildOnTile(tile, playerId)) {
+  if (!canBuildOnTile(state, tile, playerId)) {
     return {
       ok: false,
       code: 'INVALID_ACTION',

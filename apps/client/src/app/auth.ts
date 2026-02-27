@@ -16,6 +16,12 @@ interface AuthSuccess {
   username: string;
 }
 
+export interface UserCoinSpendResult {
+  ok: boolean;
+  error: string | null;
+  stats: UserStats;
+}
+
 type AuthResult = AuthFailure | AuthSuccess;
 
 const USERS_STORE_KEY = 'iceking-auth-users-v1';
@@ -229,6 +235,67 @@ export function recordGameResult(input: RecordGameResultInput): UserStats {
   users[key] = user;
   writeUsers(users);
   return { ...stats };
+}
+
+export function spendUserIceCoins(
+  rawUsername: string,
+  amount: number,
+): UserCoinSpendResult {
+  const normalized = normalizeUsername(rawUsername);
+  if (!normalized) {
+    return {
+      ok: false,
+      error: 'Username is required.',
+      stats: { ...DEFAULT_USER_STATS },
+    };
+  }
+
+  const spendAmount = Math.max(0, Math.floor(amount));
+  if (spendAmount <= 0) {
+    const users = readUsers();
+    const user = users[usernameKey(normalized)];
+    if (!user) {
+      return {
+        ok: false,
+        error: 'User not found.',
+        stats: { ...DEFAULT_USER_STATS },
+      };
+    }
+    return {
+      ok: true,
+      error: null,
+      stats: { ...user.stats },
+    };
+  }
+
+  const users = readUsers();
+  const key = usernameKey(normalized);
+  const user = users[key];
+  if (!user) {
+    return {
+      ok: false,
+      error: 'User not found.',
+      stats: { ...DEFAULT_USER_STATS },
+    };
+  }
+
+  if (user.stats.iceCoins < spendAmount) {
+    return {
+      ok: false,
+      error: 'Insufficient ice coins.',
+      stats: { ...user.stats },
+    };
+  }
+
+  user.stats.iceCoins -= spendAmount;
+  users[key] = user;
+  writeUsers(users);
+
+  return {
+    ok: true,
+    error: null,
+    stats: { ...user.stats },
+  };
 }
 
 export function createAccount(rawUsername: string, password: string): AuthResult {

@@ -30,6 +30,7 @@ export interface EngineOptions {
   botControlMode?: 'INTERNAL_HEURISTIC' | 'EXTERNAL';
   seed: string;
   players: [InitialPlayerInput, InitialPlayerInput];
+  teamByPlayerId?: Record<string, string>;
 }
 
 export class GameEngine {
@@ -47,6 +48,7 @@ export class GameEngine {
       players: options.players,
       seed: options.seed,
       nowMs: 0,
+      teamByPlayerId: options.teamByPlayerId,
     };
 
     this.state = createInitialState(stateOptions);
