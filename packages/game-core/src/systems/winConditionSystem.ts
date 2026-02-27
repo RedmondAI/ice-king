@@ -8,6 +8,32 @@ export interface MatchOutcome {
   reason: 'TIME' | 'FORFEIT' | 'DRAW' | null;
 }
 
+type TeamScore = Array<{
+  teamId: string;
+  money: number;
+  playerIds: string[];
+}>;
+
+function buildTeamScores(state: GameState): TeamScore {
+  const teamMap = new Map<string, { money: number; playerIds: string[] }>();
+  for (const playerId of state.playerOrder) {
+    const player = state.players[playerId];
+    if (!player) {
+      continue;
+    }
+    const teamId = state.teamByPlayerId?.[playerId] ?? playerId;
+    const entry = teamMap.get(teamId) ?? { money: 0, playerIds: [] };
+    entry.money += player.money;
+    entry.playerIds.push(playerId);
+    teamMap.set(teamId, entry);
+  }
+  return Array.from(teamMap.entries()).map(([teamId, value]) => ({
+    teamId,
+    money: value.money,
+    playerIds: value.playerIds,
+  }));
+}
+
 export function syncTrainYear(state: GameState): void {
   state.trainSales.currentYear = Math.floor(state.season.seasonFlipCount / 2) + 1;
 }
@@ -29,10 +55,12 @@ export function evaluateTimeWin(state: GameState, config: GameConfig): MatchOutc
     };
   }
 
-  const score = state.playerOrder
-    .map((playerId) => ({
-      playerId,
-      money: state.players[playerId]?.money ?? 0,
+  const score = buildTeamScores(state)
+    .map((entry) => ({
+      playerId: entry.playerIds[0] ?? entry.teamId,
+      teamId: entry.teamId,
+      money: entry.money,
+      members: entry.playerIds,
     }))
     .sort((a, b) => b.money - a.money);
 
@@ -57,6 +85,8 @@ export function evaluateTimeWin(state: GameState, config: GameConfig): MatchOutc
     addLog(state, 'match.ended', {
       reason: 'TIME',
       winnerId: first.playerId,
+      winnerTeam: first.teamId,
+      winnerTeamMembers: first.members,
       score,
     });
     return {
@@ -103,7 +133,11 @@ export function forfeitMatch(state: GameState, loserId: string): MatchOutcome {
     };
   }
 
-  const winnerId = state.playerOrder.find((id) => id !== loserId) ?? null;
+  const loserTeam = state.teamByPlayerId?.[loserId];
+  const winnerId = loserTeam
+    ? state.playerOrder.find((id) => (state.teamByPlayerId?.[id] ?? id) !== loserTeam) ?? null
+    : state.playerOrder.find((id) => id !== loserId) ?? null;
+
   state.match.ended = true;
   state.match.winnerId = winnerId;
 

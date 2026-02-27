@@ -29,7 +29,7 @@ export interface EngineOptions {
   configMode?: 'PROD' | 'DEV_FAST';
   botControlMode?: 'INTERNAL_HEURISTIC' | 'EXTERNAL';
   seed: string;
-  players: [InitialPlayerInput, InitialPlayerInput];
+  players: InitialPlayerInput[];
   teamByPlayerId?: Record<string, string>;
 }
 
@@ -293,7 +293,7 @@ export class GameEngine {
           ok: true,
           code: 'OK',
           message: allPlayersVoted
-            ? 'Both players voted. Summer skipped to winter.'
+            ? 'All players voted. Summer skipped to winter.'
             : 'Summer skip vote recorded.',
           payload: {
             allPlayersVoted,

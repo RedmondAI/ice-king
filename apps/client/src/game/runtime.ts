@@ -96,11 +96,17 @@ function formatMmSs(ms: number): string {
 function formatOutcome(state: GameState, playerId: string): RuntimeOutcome {
   const winnerId = state.match.winnerId;
   const winner = winnerId ? state.players[winnerId] : null;
+  const winnerTeamId = winnerId ? state.teamByPlayerId?.[winnerId] ?? winnerId : null;
+  const playerTeamId = state.teamByPlayerId?.[playerId] ?? playerId;
+  const playerWon = winnerId === null ? false : winnerTeamId === playerTeamId;
   return {
     winnerName: winner ? winner.name : null,
     winnerId: winnerId ?? null,
     reason: winnerId ? 'Match ended' : 'Draw by tie',
     playerMoney: state.players[playerId]?.money ?? 0,
+    playerWon,
+    playerTeamId,
+    winnerTeamId,
   };
 }
 
@@ -124,8 +130,8 @@ export class GameRuntime {
   private readonly hud: HudLayer;
   private readonly engine: GameEngine;
   private readonly multiplayerSession: MultiplayerSession | null;
-  private readonly playerId: 'P1' | 'P2';
-  private readonly botId: 'P1' | 'P2';
+  private readonly playerId: string;
+  private readonly botId: string | null;
   private readonly useExternalBot: boolean;
   private readonly pressedKeys = new Set<string>();
   private readonly floatingIce: FlyingIce[] = [];
@@ -174,6 +180,47 @@ export class GameRuntime {
   private chatEmojiOpen = false;
   private chatMessages: MultiplayerChatMessage[] = [];
 
+  private getStatePlayerColor(playerId: string): 'BLUE' | 'RED' | null {
+    const state = this.engine.getState();
+    const player = state.players[playerId];
+    return player?.color ?? null;
+  }
+
+  private getOpponentPlayerId(): string | null {
+    const state = this.engine.getState();
+    if (this.opts.opponentType === 'NONE') {
+      return null;
+    }
+
+    if (state.teamByPlayerId && Object.keys(state.teamByPlayerId).length > 0) {
+      const myTeam = state.teamByPlayerId[this.playerId];
+      if (!myTeam) {
+        const fallback = state.playerOrder.find((id) => id !== this.playerId) ?? null;
+        return fallback;
+      }
+
+      const opponentTeam = state.playerOrder.find(
+        (playerId) => (state.teamByPlayerId?.[playerId] ?? playerId) !== myTeam,
+      );
+      if (opponentTeam) {
+        return opponentTeam;
+      }
+    }
+
+    return state.playerOrder.find((id) => id !== this.playerId) ?? null;
+  }
+
+  private getChatTextColor(playerId: string): string {
+    const color = this.getStatePlayerColor(playerId);
+    if (color === 'BLUE') {
+      return themePalette.ownershipBlue;
+    }
+    if (color === 'RED') {
+      return themePalette.ownershipRed;
+    }
+    return themePalette.muted;
+  }
+
   constructor(options: RuntimeInit) {
     this.opts = options;
     this.gameMode = options.gameMode;
@@ -200,25 +247,46 @@ export class GameRuntime {
     this.useExternalBot = llmEnabled;
 
     if (this.multiplayerSession || options.opponentType === 'HUMAN') {
-      this.engine = new GameEngine({
-        seed: `seed-${Date.now().toString(36)}`,
-        configMode: options.configMode,
-        botControlMode: 'INTERNAL_HEURISTIC',
-        players: [
-          {
-            id: 'P1',
-            name: options.humanPlayerName,
-            color: 'BLUE',
-            controller: 'HUMAN',
-          },
-          {
-            id: 'P2',
-            name: 'Player 2',
-            color: 'RED',
-            controller: 'HUMAN',
-          },
-        ],
-      });
+      if (options.initialState && options.initialState.playerOrder.length > 0) {
+        const fallbackName = options.humanPlayerName;
+        const initialPlayers = options.initialState.playerOrder.map((playerId, index) => {
+          const statePlayer = options.initialState?.players[playerId];
+          const color = statePlayer?.color ?? (index % 2 === 0 ? 'BLUE' : 'RED');
+          return {
+            id: playerId,
+            name: statePlayer?.name ?? `${fallbackName} ${index + 1}`,
+            color,
+            controller: 'HUMAN' as const,
+          };
+        });
+        this.engine = new GameEngine({
+          seed: `seed-${Date.now().toString(36)}`,
+          configMode: options.configMode,
+          botControlMode: 'INTERNAL_HEURISTIC',
+          players: initialPlayers,
+          teamByPlayerId: options.initialState.teamByPlayerId,
+        });
+      } else {
+        this.engine = new GameEngine({
+          seed: `seed-${Date.now().toString(36)}`,
+          configMode: options.configMode,
+          botControlMode: 'INTERNAL_HEURISTIC',
+          players: [
+            {
+              id: 'P1',
+              name: options.humanPlayerName,
+              color: 'BLUE',
+              controller: 'HUMAN',
+            },
+            {
+              id: 'P2',
+              name: 'Player 2',
+              color: 'RED',
+              controller: 'HUMAN',
+            },
+          ],
+        });
+      }
     } else if (options.opponentType === 'NONE') {
       this.engine = new GameEngine({
         seed: `seed-${Date.now().toString(36)}`,
@@ -973,11 +1041,7 @@ export class GameRuntime {
       const hh = time.getHours().toString().padStart(2, '0');
       const mm = time.getMinutes().toString().padStart(2, '0');
       meta.textContent = `${message.playerName} • ${hh}:${mm}`;
-      if (message.playerId === 'P1') {
-        meta.style.color = themePalette.ownershipBlue;
-      } else {
-        meta.style.color = themePalette.ownershipRed;
-      }
+      meta.style.color = this.getChatTextColor(message.playerId);
 
       const text = document.createElement('div');
       text.className = 'chat-text';
@@ -1333,19 +1397,17 @@ export class GameRuntime {
 
     const afterSeason = this.engine.getState().season.logicSeason;
     if (beforeSeason === 'SUMMER' && afterSeason === 'WINTER') {
-      this.hud.showToast('Both players voted. Summer skipped.');
+      this.hud.showToast('All players voted. Summer skipped.');
       return;
     }
 
-    this.hud.showToast('Vote recorded. Waiting for the other player.');
+    this.hud.showToast('Vote recorded. Waiting for other players.');
   };
 
   private updateHud(): void {
     const split = this.engine.getPlayerStorage(this.playerId);
     const state = this.engine.getState();
-    const opponentId = this.opts.opponentType === 'NONE'
-      ? null
-      : Object.keys(state.players).find((id) => id !== this.playerId) ?? null;
+    const opponentId = this.getOpponentPlayerId();
     const opponentSplit = opponentId ? this.engine.getPlayerStorage(opponentId) : null;
     const runtimeMode = this.multiplayerSession
       ? 'MULTIPLAYER'
@@ -1491,6 +1553,10 @@ export class GameRuntime {
         }
 
         return JSON.stringify({
+          mapSize: {
+            width: state.width,
+            height: state.height,
+          },
           coordinateSystem: {
             origin: 'top-left',
             axisX: 'increases right',

@@ -16,6 +16,9 @@ export interface RuntimeOutcome {
   reason: string;
   playerMoney: number;
   winnerId: string | null;
+  playerWon: boolean;
+  playerTeamId: string | null;
+  winnerTeamId: string | null;
 }
 
 export interface RuntimeInit {

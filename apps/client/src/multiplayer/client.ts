@@ -1,6 +1,8 @@
 import type { ActionResult, GameAction, GameState } from '@ice-king/shared';
 
-export type MultiplayerPlayerId = 'P1' | 'P2';
+export const MULTIPLAYER_PLAYER_IDS = ['P1', 'P2', 'P3', 'P4'] as const;
+
+export type MultiplayerPlayerId = (typeof MULTIPLAYER_PLAYER_IDS)[number];
 
 export interface MultiplayerSession {
   roomCode: string;
@@ -23,7 +25,7 @@ export interface MultiplayerLobbyPlayerState {
   connected: boolean;
 }
 
-export type MultiplayerGameMode = 'PLAY_ONLINE' | 'FRIENDLY';
+export type MultiplayerGameMode = 'PLAY_ONLINE' | 'FRIENDLY' | 'TEAM';
 
 export interface MultiplayerLobbyState {
   roomCode: string;
@@ -33,6 +35,8 @@ export interface MultiplayerLobbyState {
   players: {
     P1: MultiplayerLobbyPlayerState;
     P2: MultiplayerLobbyPlayerState | null;
+    P3: MultiplayerLobbyPlayerState | null;
+    P4: MultiplayerLobbyPlayerState | null;
   };
   disconnectedPlayerId: string | null;
   pausedAtMs: number | null;

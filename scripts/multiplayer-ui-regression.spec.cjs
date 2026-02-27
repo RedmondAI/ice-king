@@ -121,6 +121,24 @@ async function readRenderState(page) {
   return JSON.parse(raw);
 }
 
+async function joinRoom(page, roomCode) {
+  const joinDialogHandled = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Timed out while waiting for Join Game prompt.'));
+    }, 5000);
+    page.once('dialog', (dialog) => {
+      clearTimeout(timeout);
+      if (dialog.type() !== 'prompt') {
+        reject(new Error(`Unexpected dialog type: ${dialog.type()}`));
+        return;
+      }
+      void dialog.accept(roomCode).then(resolve).catch(reject);
+    });
+  });
+  await page.getByRole('button', { name: 'Join Game' }).click();
+  await joinDialogHandled;
+}
+
 async function createAccount(page, username, password) {
   await page.locator('input[placeholder="Username"]').fill(username);
   await page.locator('input[placeholder="Password (min 4 chars)"]').fill(password);
@@ -356,5 +374,101 @@ test('friendly flow: create, join, ready, start, action', async ({ browser }) =>
     await guest.close();
     await hostContext.close();
     await guestContext.close();
+  }
+});
+
+test('team flow: create, join 3 players, ready, start, action', async ({ browser }) => {
+  const hostContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const guestContext1 = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const guestContext2 = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const guestContext3 = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+
+  const host = await hostContext.newPage();
+  const guest1 = await guestContext1.newPage();
+  const guest2 = await guestContext2.newPage();
+  const guest3 = await guestContext3.newPage();
+
+  await host.addInitScript(() => localStorage.clear());
+  await guest1.addInitScript(() => localStorage.clear());
+  await guest2.addInitScript(() => localStorage.clear());
+  await guest3.addInitScript(() => localStorage.clear());
+
+  try {
+    await host.goto(BASE_URL);
+    await guest1.goto(BASE_URL);
+    await guest2.goto(BASE_URL);
+    await guest3.goto(BASE_URL);
+
+    await createAccount(host, 'Team Host CI', 'pass1');
+    await host.getByRole('button', { name: 'Create Game' }).click();
+    await host.getByRole('button', { name: /5: Team/ }).click();
+
+    await expect(host.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+    const roomCode = await readLobbyRoomCode(host);
+
+    await createAccount(guest1, 'Team Guest 1', 'pass2');
+    await createAccount(guest2, 'Team Guest 2', 'pass3');
+    await createAccount(guest3, 'Team Guest 3', 'pass4');
+
+    await joinRoom(guest1, roomCode);
+    await expect(guest1.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+    const guestCode1 = await readLobbyRoomCode(guest1);
+    expect(guestCode1).toBe(roomCode);
+
+    await joinRoom(guest2, roomCode);
+    await expect(guest2.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+    const guestCode2 = await readLobbyRoomCode(guest2);
+    expect(guestCode2).toBe(roomCode);
+
+    await joinRoom(guest3, roomCode);
+    await expect(guest3.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+    const guestCode3 = await readLobbyRoomCode(guest3);
+    expect(guestCode3).toBe(roomCode);
+
+    await host.getByRole('button', { name: 'Set Ready' }).click();
+    await guest1.getByRole('button', { name: 'Set Ready' }).click();
+    await guest2.getByRole('button', { name: 'Set Ready' }).click();
+    await guest3.getByRole('button', { name: 'Set Ready' }).click();
+
+    const hostStart = host.getByRole('button', { name: 'Start Match' });
+    await expect(hostStart).toBeEnabled();
+    await hostStart.click();
+
+    await expect(host.locator('#game-canvas')).toBeVisible();
+    await expect(guest1.locator('#game-canvas')).toBeVisible();
+    await expect(guest2.locator('#game-canvas')).toBeVisible();
+    await expect(guest3.locator('#game-canvas')).toBeVisible();
+
+    const beforeHost = await readRenderState(host);
+    if (!beforeHost) {
+      throw new Error('render_game_to_text unavailable in team host runtime.');
+    }
+
+    expect(beforeHost.mapSize.width).toBe(22);
+    expect(beforeHost.mapSize.height).toBe(22);
+
+    await host.click('#game-canvas');
+    await host.keyboard.down('ArrowRight');
+    await host.waitForTimeout(800);
+    await host.keyboard.up('ArrowRight');
+
+    await guest1.waitForTimeout(600);
+
+    const afterHost = await readRenderState(host);
+    if (!afterHost) {
+      throw new Error('render_game_to_text unavailable after team action.');
+    }
+    expect(afterHost.mode).toBe('PLAYING');
+    const moved = Math.abs(afterHost.camera.x - beforeHost.camera.x) > 0.005 || Math.abs(afterHost.camera.y - beforeHost.camera.y) > 0.005;
+    expect(moved).toBeTruthy();
+  } finally {
+    await host.close();
+    await guest1.close();
+    await guest2.close();
+    await guest3.close();
+    await hostContext.close();
+    await guestContext1.close();
+    await guestContext2.close();
+    await guestContext3.close();
   }
 });

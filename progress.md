@@ -2,6 +2,27 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-02-27 (Milestone Update 41)
+- Implemented `Team` multiplayer mode in create-game flow and room runtime:
+  - added 4-player team setup in `Team` mode (`P1/P2` blue, `P3/P4` red);
+  - room creation scales map dimensions, natural ponds, and houses by 2 for team maps.
+- Updated multiplayer room validation for variable player count:
+  - team requires 4 joined/ready players before host can start;
+  - ready gating now enforces mode-wide all-player readiness.
+- Added team outcome handling through runtime and engine:
+  - team scoring for time-based win conditions;
+  - per-player win display supports teammate wins as `playerWon`.
+- Added mode-picker support and gating:
+  - `Team` appears unlocked when user has `80` Ice Coins and charges that cost at create-time.
+- Extended Playwright UI regression coverage:
+  - team create/join flow with 3 guests;
+  - readiness/host start gating for 4 slots;
+  - map-size assertion checks for scaled team map (`22x22` in rendered state).
+- Validation:
+  - `npm run test` -> pass
+  - `npm run build` -> pass
+  - `npm run test:multiplayer:ui` -> pass (`4 passed`)
+
 ## 2026-02-27 (Milestone Update 40)
 - Implemented `Friendly` mode creation from Create Game popup:
   - added mode-aware lobby mapping from server mode payloads;

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { GameEngine } from '@ice-king/game-core';
+import { createGameConfig } from '@ice-king/config';
 import { GameActionSchema, type ActionResult, type GameAction, type GameState } from '@ice-king/shared';
 
 function readBody(req: NodeJS.ReadableStream, maxBytes = 512 * 1024): Promise<string> {
@@ -90,7 +91,23 @@ interface BotUsageResponse {
   totalTokens: number;
 }
 
-type MultiplayerPlayerId = 'P1' | 'P2';
+type MultiplayerPlayerId = 'P1' | 'P2' | 'P3' | 'P4';
+
+const MULTIPLAYER_PLAYER_IDS: MultiplayerPlayerId[] = ['P1', 'P2', 'P3', 'P4'];
+const TEAM_ROLES: Record<'TEAM' | 'OTHER', Record<MultiplayerPlayerId, 'BLUE' | 'RED'>> = {
+  TEAM: {
+    P1: 'BLUE',
+    P2: 'BLUE',
+    P3: 'RED',
+    P4: 'RED',
+  },
+  OTHER: {
+    P1: 'BLUE',
+    P2: 'RED',
+    P3: 'BLUE',
+    P4: 'RED',
+  },
+};
 
 interface MultiplayerRoomPlayer {
   id: MultiplayerPlayerId;
@@ -114,13 +131,15 @@ interface MultiplayerLobbySnapshot {
   roomCode: string;
   started: boolean;
   hostPlayerId: MultiplayerPlayerId;
-  mode: 'PLAY_ONLINE' | 'FRIENDLY';
+  mode: 'PLAY_ONLINE' | 'FRIENDLY' | 'TEAM';
   disconnectedPlayerId: string | null;
   pausedAtMs: number | null;
   timeoutAtMs: number | null;
   players: {
     P1: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
     P2: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
+    P3: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
+    P4: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
   };
 }
 
@@ -128,7 +147,7 @@ interface MultiplayerRoom {
   roomCode: string;
   configMode: 'PROD' | 'DEV_FAST';
   engine: GameEngine;
-  mode: 'PLAY_ONLINE' | 'FRIENDLY';
+  mode: 'PLAY_ONLINE' | 'FRIENDLY' | 'TEAM';
   createdAtMs: number;
   updatedAtMs: number;
   lastTickAtMs: number;
@@ -140,6 +159,8 @@ interface MultiplayerRoom {
   players: {
     P1: MultiplayerRoomPlayer;
     P2: MultiplayerRoomPlayer | null;
+    P3: MultiplayerRoomPlayer | null;
+    P4: MultiplayerRoomPlayer | null;
   };
   chat: MultiplayerChatMessage[];
 }
@@ -363,35 +384,28 @@ function sanitizeChatText(raw: unknown): string {
 
 function syncRoomPresence(room: MultiplayerRoom): void {
   const state = room.engine.getState();
-  const p1 = room.players.P1;
-  const p2 = room.players.P2;
-
-  const stateP1 = state.players.P1;
-  if (stateP1) {
-    stateP1.name = p1.name;
-    stateP1.connected = p1.connected;
-    stateP1.ready = p1.ready;
-    stateP1.controller = 'HUMAN';
-  }
-
-  const stateP2 = state.players.P2;
-  if (stateP2) {
-    if (p2) {
-      stateP2.name = p2.name;
-      stateP2.connected = p2.connected;
-      stateP2.ready = p2.ready;
-    } else {
-      stateP2.name = 'Waiting for player...';
-      stateP2.connected = false;
-      stateP2.ready = false;
+  for (const playerId of MULTIPLAYER_PLAYER_IDS) {
+    const roomPlayer = room.players[playerId];
+    const statePlayer = state.players[playerId];
+    if (!statePlayer) {
+      continue;
     }
-    stateP2.controller = 'HUMAN';
+
+    if (roomPlayer) {
+      statePlayer.name = roomPlayer.name;
+      statePlayer.connected = roomPlayer.connected;
+      statePlayer.ready = roomPlayer.ready;
+    } else {
+      statePlayer.name = 'Waiting for player...';
+      statePlayer.connected = false;
+      statePlayer.ready = false;
+    }
+
+    statePlayer.controller = 'HUMAN';
   }
 }
 
 function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
-  const p1 = room.players.P1;
-  const p2 = room.players.P2;
   return {
     roomCode: room.roomCode,
     started: room.started,
@@ -399,17 +413,33 @@ function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
     mode: room.mode,
     players: {
       P1: {
-        id: p1.id,
-        name: p1.name,
-        ready: p1.ready,
-        connected: p1.connected,
+        id: room.players.P1.id,
+        name: room.players.P1.name,
+        ready: room.players.P1.ready,
+        connected: room.players.P1.connected,
       },
-      P2: p2
+      P2: room.players.P2
         ? {
-            id: p2.id,
-            name: p2.name,
-            ready: p2.ready,
-            connected: p2.connected,
+            id: room.players.P2.id,
+            name: room.players.P2.name,
+            ready: room.players.P2.ready,
+            connected: room.players.P2.connected,
+          }
+        : null,
+      P3: room.players.P3
+        ? {
+            id: room.players.P3.id,
+            name: room.players.P3.name,
+            ready: room.players.P3.ready,
+            connected: room.players.P3.connected,
+          }
+        : null,
+      P4: room.players.P4
+        ? {
+            id: room.players.P4.id,
+            name: room.players.P4.name,
+            ready: room.players.P4.ready,
+            connected: room.players.P4.connected,
           }
         : null,
     },
@@ -440,13 +470,55 @@ function pruneStaleRooms(rooms: Map<string, MultiplayerRoom>, nowMs: number, ttl
 }
 
 function findPlayerByToken(room: MultiplayerRoom, token: string): MultiplayerRoomPlayer | null {
-  if (room.players.P1.token === token) {
-    return room.players.P1;
-  }
-  if (room.players.P2?.token === token) {
-    return room.players.P2;
+  for (const playerId of MULTIPLAYER_PLAYER_IDS) {
+    const player = room.players[playerId];
+    if (player?.token === token) {
+      return player;
+    }
   }
   return null;
+}
+
+function getActivePlayerList(room: MultiplayerRoom): MultiplayerRoomPlayer[] {
+  return [room.players.P1, room.players.P2, room.players.P3, room.players.P4].filter(
+    (player): player is MultiplayerRoomPlayer => player !== null,
+  );
+}
+
+function getRequiredPlayerCount(mode: MultiplayerRoom['mode']): number {
+  return mode === 'TEAM' ? 4 : 2;
+}
+
+function getStartingTeamAssignment(mode: MultiplayerRoom['mode']): Record<string, string> | undefined {
+  if (mode !== 'TEAM' && mode !== 'FRIENDLY') {
+    return undefined;
+  }
+
+  if (mode === 'TEAM') {
+    return {
+      P1: 'BLUE',
+      P2: 'BLUE',
+      P3: 'RED',
+      P4: 'RED',
+    };
+  }
+
+  return {
+    P1: 'FRIENDLY',
+    P2: 'FRIENDLY',
+    P3: 'FRIENDLY',
+    P4: 'FRIENDLY',
+  };
+}
+
+function makeRoomPlayers(hostPlayer: MultiplayerRoomPlayer): MultiplayerRoom['players'] {
+  const players: MultiplayerRoom['players'] = {
+    P1: hostPlayer,
+    P2: null,
+    P3: null,
+    P4: null,
+  };
+  return players;
 }
 
 function jsonResponse(res: any, statusCode: number, payload: Record<string, unknown>): void {
@@ -528,7 +600,7 @@ function refreshDisconnectedState(room: MultiplayerRoom, nowMs: number): void {
     return;
   }
 
-  const players = [room.players.P1, room.players.P2].filter((p): p is MultiplayerRoomPlayer => Boolean(p));
+  const players = getActivePlayerList(room);
   for (const player of players) {
     if (player.connected && nowMs - player.lastSeenMs > room.reconnectPauseMs) {
       player.connected = false;
@@ -635,7 +707,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
         const playerName = sanitizePlayerName(body.playerName, 'Player 1');
         const configMode = body.configMode === 'DEV_FAST' ? 'DEV_FAST' : 'PROD';
         const preferredRoomCode = normalizeRoomCode(String(body.preferredRoomCode ?? ''));
-        const mode = body.mode === 'FRIENDLY' ? 'FRIENDLY' : 'PLAY_ONLINE';
+        const mode = body.mode === 'TEAM' ? 'TEAM' : body.mode === 'FRIENDLY' ? 'FRIENDLY' : 'PLAY_ONLINE';
 
         const roomCode = preferredRoomCode || createUniqueRoomCode(rooms);
         if (!roomCode) {
@@ -663,30 +735,54 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           lastSeenMs: nowMs,
         };
 
+        const baseConfig = createGameConfig({}, configMode);
+        const isTeamMode = mode === 'TEAM';
+        const mapScale = isTeamMode ? 2 : 1;
         const engine = new GameEngine({
           configMode,
           botControlMode: 'INTERNAL_HEURISTIC',
           seed: `room-${roomCode}-${nowMs.toString(36)}`,
+          config: isTeamMode
+            ? {
+                map: {
+                  width: baseConfig.map.width * mapScale,
+                  height: baseConfig.map.height * mapScale,
+                  naturalPondCount: baseConfig.map.naturalPondCount * mapScale,
+                  housesCount: baseConfig.map.housesCount * mapScale,
+                },
+              }
+            : {},
           players: [
             {
               id: 'P1',
               name: hostPlayer.name,
-              color: 'BLUE',
+              color: TEAM_ROLES.OTHER.P1,
               controller: 'HUMAN',
             },
             {
               id: 'P2',
               name: 'Waiting for player...',
-              color: 'RED',
+              color: TEAM_ROLES.OTHER.P2,
               controller: 'HUMAN',
             },
+            ...(isTeamMode
+              ? [
+                  {
+                    id: 'P3',
+                    name: 'Waiting for player...',
+                    color: TEAM_ROLES.TEAM.P3,
+                    controller: 'HUMAN',
+                  },
+                  {
+                    id: 'P4',
+                    name: 'Waiting for player...',
+                    color: TEAM_ROLES.TEAM.P4,
+                    controller: 'HUMAN',
+                  },
+                ]
+              : []),
           ],
-          teamByPlayerId: mode === 'FRIENDLY'
-            ? {
-                P1: 'FRIENDLY',
-                P2: 'FRIENDLY',
-              }
-            : undefined,
+          teamByPlayerId: getStartingTeamAssignment(mode),
         });
 
         const room: MultiplayerRoom = {
@@ -702,10 +798,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           disconnectedPlayerId: null,
           pausedAtMs: null,
           timeoutAtMs: null,
-          players: {
-            P1: hostPlayer,
-            P2: null,
-          },
+          players: makeRoomPlayers(hostPlayer),
           chat: [],
         };
         syncRoomPresence(room);
@@ -734,15 +827,33 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           return;
         }
 
-        if (room.players.P2 && room.players.P2.connected) {
+        const activePlayerCount = getActivePlayerList(room).length;
+        const requiredPlayers = getRequiredPlayerCount(room.mode);
+        if (activePlayerCount >= requiredPlayers) {
           jsonResponse(res, 409, { error: 'ROOM_FULL' });
           return;
         }
 
         refreshDisconnectedState(room, nowMs);
+        const joinId = ((): MultiplayerPlayerId | null => {
+          if (!room.players.P2) {
+            return 'P2';
+          }
+          if (!room.players.P3) {
+            return room.mode === 'TEAM' ? 'P3' : null;
+          }
+          if (!room.players.P4) {
+            return room.mode === 'TEAM' ? 'P4' : null;
+          }
+          return null;
+        })();
+        if (!joinId) {
+          jsonResponse(res, 409, { error: 'ROOM_FULL' });
+          return;
+        }
         const joiner: MultiplayerRoomPlayer = {
-          id: 'P2',
-          name: sanitizePlayerName(body.playerName, 'Player 2'),
+          id: joinId,
+          name: sanitizePlayerName(body.playerName, `Player ${joinId}`),
           token: playerToken(),
           ready: false,
           connected: true,
@@ -750,7 +861,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           lastSeenMs: nowMs,
         };
 
-        room.players.P2 = joiner;
+        room.players[joinId] = joiner;
         room.disconnectedPlayerId = null;
         room.pausedAtMs = null;
         room.timeoutAtMs = null;
@@ -874,12 +985,18 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           jsonResponse(res, 403, { error: 'ONLY_HOST_CAN_START' });
           return;
         }
-        if (!room.players.P2) {
-          jsonResponse(res, 409, { error: 'PLAYER_TWO_NOT_JOINED' });
+        const requiredPlayers = getRequiredPlayerCount(room.mode);
+        const joinedPlayers = getActivePlayerList(room);
+        if (joinedPlayers.length < requiredPlayers) {
+          jsonResponse(res, 409, {
+            error: 'NOT_ALL_PLAYERS_HAVE_JOINED',
+            details: `This mode requires ${requiredPlayers} players before start.`,
+          });
           return;
         }
-        if (!room.players.P1.ready || !room.players.P2.ready) {
-          jsonResponse(res, 409, { error: 'BOTH_PLAYERS_MUST_BE_READY' });
+        const readyPlayers = joinedPlayers.filter((entry) => entry.ready);
+        if (readyPlayers.length < requiredPlayers) {
+          jsonResponse(res, 409, { error: 'BOTH_PLAYERS_MUST_BE_READY', details: 'All players must be ready before starting.' });
           return;
         }
 

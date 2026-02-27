@@ -18,7 +18,7 @@ export interface InitialPlayerInput {
 export interface CreateInitialStateOptions {
   seed: string;
   config: GameConfig;
-  players: [InitialPlayerInput, InitialPlayerInput];
+  players: InitialPlayerInput[];
   nowMs?: number;
   teamByPlayerId?: Record<string, string>;
 }

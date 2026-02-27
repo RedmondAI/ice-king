@@ -1,6 +1,6 @@
 # GAME_SPEC
 
-Last updated: 2026-02-26
+Last updated: 2026-02-27
 
 ## Current Playable Mode
 - Supported modes:
@@ -9,7 +9,8 @@ Last updated: 2026-02-26
   - `Play Online` (two human players over `/api/multiplayer/*` room service).
   - `Solo` (single-player run with no active computer opponent).
   - `Friendly` (two-player mode with shared land ownership and separate player resources; requires `50` Ice Coins).
-  - `Team` and `Ice Wars` are visible but locked placeholders.
+  - `Team` (four-player team mode; map/pools/board are scaled up; requires `80` Ice Coins; currently in multiplayer).
+  - `Ice Wars` is currently a locked placeholder.
 - `Join Game` remains available for joining existing online room codes.
 - Multiplayer authority currently runs in the Vite host process (in-memory, no persistent backend yet).
 - Ice Coin economy:
@@ -21,7 +22,7 @@ Last updated: 2026-02-26
   - `POST /api/multiplayer/create` returns host room session info and lobby snapshot.
   - `POST /api/multiplayer/join` joins a known room code and returns guest session.
   - `POST /api/multiplayer/ready` toggles readiness per player.
-  - `POST /api/multiplayer/start` is host-gated (`P1` only), requires both players ready.
+  - `POST /api/multiplayer/start` is host-gated (`P1` only), requires all players in the room and ready.
   - `GET /api/multiplayer/state` polls lobby and state.
   - `POST /api/multiplayer/action` applies validated gameplay actions.
   - `POST /api/multiplayer/chat` appends a room chat message and returns updated room payload.

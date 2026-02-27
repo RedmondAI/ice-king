@@ -11,6 +11,7 @@ import {
   joinMultiplayerRoom,
   setMultiplayerReady,
   startMultiplayerRoom,
+  type MultiplayerGameMode,
   type MultiplayerLobbyState,
   type MultiplayerSession,
 } from '../multiplayer/client';
@@ -33,7 +34,7 @@ interface AppContext {
   multiplayerSession: MultiplayerSession | null;
 }
 
-type LobbyMode = 'HUMAN' | 'BOT' | 'NONE' | 'FRIENDLY';
+type LobbyMode = 'HUMAN' | 'BOT' | 'NONE' | 'FRIENDLY' | 'TEAM';
 
 const FRIENDLY_ENTRY_COST = 50;
 const TEAM_ENTRY_COST = 80;
@@ -45,6 +46,9 @@ function gameModeFromLobbyMode(mode: LobbyMode): GameMode {
   if (mode === 'FRIENDLY') {
     return 'FRIENDLY';
   }
+  if (mode === 'TEAM') {
+    return 'TEAM';
+  }
   if (mode === 'NONE') {
     return 'SOLO';
   }
@@ -52,11 +56,14 @@ function gameModeFromLobbyMode(mode: LobbyMode): GameMode {
 }
 
 function lobbyModeFromServerMode(serverMode: MultiplayerLobbyState['mode']): LobbyMode {
+  if (serverMode === 'TEAM') {
+    return 'TEAM';
+  }
   return serverMode === 'FRIENDLY' ? 'FRIENDLY' : 'HUMAN';
 }
 
 function runtimeOpponentFromLobbyMode(mode: LobbyMode): 'HUMAN' | 'BOT' | 'NONE' {
-  return mode === 'HUMAN' || mode === 'FRIENDLY' ? 'HUMAN' : mode;
+  return mode === 'HUMAN' || mode === 'FRIENDLY' || mode === 'TEAM' ? 'HUMAN' : mode;
 }
 
 interface PersistedMultiplayerSession {
@@ -211,6 +218,9 @@ function friendlyMultiplayerError(error: unknown): { code: string | null; messag
   }
   if (code === 'BOTH_PLAYERS_MUST_BE_READY') {
     return { code, message: 'Both players must be ready before starting.' };
+  }
+  if (code === 'NOT_ALL_PLAYERS_HAVE_JOINED' || code === 'ALL_PLAYERS_MUST_BE_READY') {
+    return { code, message: detailMessage.length > 0 ? detailMessage : 'Waiting for all players to be ready.' };
   }
   if (code === 'PLAYER_TWO_NOT_JOINED') {
     return { code, message: 'Second player has not joined yet.' };
@@ -440,13 +450,23 @@ function renderSplash(ctx: AppContext): void {
     updateMenuDisabled();
   };
 
-  const startMultiplayerRoomWithMode = (mode: MultiplayerLobbyState['mode']): void => {
+  const getModeEntryCost = (serverMode: MultiplayerGameMode): number => {
+    if (serverMode === 'FRIENDLY') {
+      return FRIENDLY_ENTRY_COST;
+    }
+    if (serverMode === 'TEAM') {
+      return TEAM_ENTRY_COST;
+    }
+    return 0;
+  };
+
+  const startMultiplayerRoomWithMode = (mode: MultiplayerGameMode): void => {
     if (isBusy || !ctx.playerName) {
       return;
     }
-    const isFriendly = mode === 'FRIENDLY';
-    if (isFriendly && getUserStats(ctx.playerName).iceCoins < FRIENDLY_ENTRY_COST) {
-      alert(`Friendly mode requires ${FRIENDLY_ENTRY_COST} ice coins.`);
+    const entryCost = getModeEntryCost(mode);
+    if (entryCost > 0 && getUserStats(ctx.playerName).iceCoins < entryCost) {
+      alert(`This mode requires ${entryCost} ice coins.`);
       return;
     }
     createModeOpen = false;
@@ -455,10 +475,10 @@ function renderSplash(ctx: AppContext): void {
     updateMenuDisabled();
     void createMultiplayerRoom(ctx.playerName, currentConfigMode(), roomFromQuery || null, mode)
       .then((response) => {
-        if (isFriendly) {
-          const spent = spendUserIceCoins(ctx.playerName, FRIENDLY_ENTRY_COST);
+        if (entryCost > 0) {
+          const spent = spendUserIceCoins(ctx.playerName, entryCost);
           if (!spent.ok) {
-            alert(`Could not start Friendly mode: ${spent.error}`);
+            alert(`Could not start mode (${mode}): ${spent.error}`);
             return;
           }
         }
@@ -480,9 +500,13 @@ function renderSplash(ctx: AppContext): void {
 
   const currentUserStats = getUserStats(ctx.playerName);
   const hasFriendlyFunds = currentUserStats.iceCoins >= FRIENDLY_ENTRY_COST;
+  const hasTeamFunds = currentUserStats.iceCoins >= TEAM_ENTRY_COST;
   const friendlyLabel = hasFriendlyFunds
     ? `4: Friendly (${FRIENDLY_ENTRY_COST} Ice Coins)`
     : '4: Friendly (Locked, 50 Ice Coins)';
+  const teamLabel = hasTeamFunds
+    ? `5: Team (${TEAM_ENTRY_COST} Ice Coins)`
+    : `5: Team (Locked, ${TEAM_ENTRY_COST} Ice Coins)`;
 
   const createModeOptions: Array<{
     label: string;
@@ -529,9 +553,14 @@ function renderSplash(ctx: AppContext): void {
         : undefined,
     },
     {
-      label: `5: Team (Locked, ${TEAM_ENTRY_COST} Ice Coins)`,
-      description: `Locked until release (cost ${TEAM_ENTRY_COST} Ice Coins).`,
-      isLocked: true,
+      label: teamLabel,
+      description: '4-player team mode on shared teams, with map and ponds scaled up.',
+      isLocked: !hasTeamFunds,
+      onSelect: hasTeamFunds
+        ? () => {
+          startMultiplayerRoomWithMode('TEAM');
+        }
+        : undefined,
     },
     {
       label: `6: Ice Wars (Locked, ${TEAM_ENTRY_COST} Ice Coins)`,
@@ -773,7 +802,37 @@ function renderLobby(
 ): void {
   clearRoot(ctx.root);
 
-  const isMultiplayer = opponentType === 'HUMAN' || opponentType === 'FRIENDLY';
+  const isMultiplayer = opponentType === 'HUMAN' || opponentType === 'FRIENDLY' || opponentType === 'TEAM';
+  const isTeamMode = opponentType === 'TEAM';
+  type LobbySlotId = keyof MultiplayerLobbyState['players'];
+
+  const visibleSlotIds: LobbySlotId[] = isMultiplayer
+    ? (isTeamMode ? ['P1', 'P2', 'P3', 'P4'] : ['P1', 'P2'])
+    : ['P1'];
+
+  const getModeLabel = (mode: LobbyMode): string => {
+    if (mode === 'BOT') {
+      return 'Play vs Computer';
+    }
+    if (mode === 'NONE') {
+      return 'Solo';
+    }
+    if (mode === 'FRIENDLY') {
+      return 'Friendly';
+    }
+    if (mode === 'TEAM') {
+      return 'Team';
+    }
+    return 'Play Online';
+  };
+
+  const slotStyleForTeam = (slotId: LobbySlotId): string => {
+    if (isTeamMode) {
+      return slotId === 'P3' || slotId === 'P4' ? 'var(--red)' : 'var(--blue)';
+    }
+    return slotId === 'P1' ? 'var(--blue)' : 'var(--red)';
+  };
+
   const shell = document.createElement('div');
   shell.className = 'app-shell lobby-screen';
 
@@ -789,7 +848,7 @@ function renderLobby(
   roomInfo.className = 'subtle';
   roomInfo.textContent = isMultiplayer
     ? `Room Code: ${ctx.roomCode}`
-    : `Mode: ${opponentType === 'BOT' ? 'Play vs Computer' : 'Solo'}`;
+    : `Mode: ${getModeLabel(opponentType)}`;
 
   const inviteButton = createButton('Copy Invite Link', () => {
     void navigator.clipboard.writeText(buildInviteLink(ctx.roomCode));
@@ -802,25 +861,39 @@ function renderLobby(
   slotPanel.style.display = 'grid';
   slotPanel.style.gap = '8px';
 
-  const playerSlot = document.createElement('div');
-  playerSlot.textContent = `Blue: ${ctx.playerName || 'Player'} (Not Ready)`;
-  playerSlot.style.color = 'var(--blue)';
+  const slotEls: Record<LobbySlotId, HTMLDivElement> = Object.fromEntries(
+    visibleSlotIds.map((slotId) => {
+      const node = document.createElement('div');
+      node.textContent = `${slotId}: Waiting for player...`;
+      return [slotId, node];
+    }),
+  ) as Record<LobbySlotId, HTMLDivElement>;
 
-  const opponentSlot = document.createElement('div');
-  opponentSlot.textContent = opponentType === 'BOT'
-    ? 'Red: Ice Bot (Ready)'
-    : opponentType === 'NONE'
-      ? 'Solo: No opponent'
-      : 'Red: Waiting for player...';
-  opponentSlot.style.color = opponentType === 'NONE' ? 'var(--ui-text)' : 'var(--red)';
+  if (!isMultiplayer) {
+    slotEls.P1.textContent = `${ctx.playerName || 'Player'} (Not Ready)`;
+  }
+
+  const renderSlot = (slotId: LobbySlotId, player: MultiplayerLobbyState['players'][LobbySlotId]): void => {
+    const slot = slotEls[slotId];
+    slot.style.color = slotStyleForTeam(slotId);
+    if (!player) {
+      slot.textContent = `${slotId}: Waiting for player...`;
+      return;
+    }
+
+    const connectedText = player.connected ? '' : ' [disconnected]';
+    slot.textContent = `${slotId}: ${player.name} (${player.ready ? 'Ready' : 'Not Ready'})${connectedText}`;
+  };
 
   const lobbyStatus = document.createElement('p');
   lobbyStatus.className = 'subtle';
   lobbyStatus.textContent = isMultiplayer
-    ? 'Waiting for both players to ready up.'
+    ? 'Waiting for all players to join and ready up.'
     : 'Toggle Ready then start the match.';
 
-  slotPanel.append(playerSlot, opponentSlot);
+  visibleSlotIds.forEach((slotId) => {
+    slotPanel.append(slotEls[slotId]);
+  });
 
   let isReady = false;
   let disposed = false;
@@ -873,23 +946,33 @@ function renderLobby(
     lobbyState = nextLobby;
     syncedState = nextState;
 
-    const p1 = nextLobby.players.P1;
-    const p2 = nextLobby.players.P2;
+    const playersBySlot = {
+      P1: nextLobby.players.P1,
+      P2: nextLobby.players.P2,
+      P3: nextLobby.players.P3,
+      P4: nextLobby.players.P4,
+    };
+    const requiredSlots = opponentType === 'TEAM'
+      ? [playersBySlot.P1, playersBySlot.P2, playersBySlot.P3, playersBySlot.P4]
+      : [playersBySlot.P1, playersBySlot.P2];
+    const joinedCount = requiredSlots.filter(Boolean).length;
 
-    const p1Tag = p1?.connected ? '' : ' [disconnected]';
-    const p2Tag = p2?.connected ? '' : ' [disconnected]';
-
-    playerSlot.textContent = p1
-      ? `Blue: ${p1.name} (${p1.ready ? 'Ready' : 'Not Ready'})${p1Tag}`
-      : 'Blue: Waiting for player...';
-
-    opponentSlot.textContent = opponentType === 'BOT'
-      ? 'Red: Ice Bot (Ready)'
-      : p2
-        ? `Red: ${p2.name} (${p2.ready ? 'Ready' : 'Not Ready'})${p2Tag}`
-        : 'Red: Waiting for player...';
+    for (const slotId of visibleSlotIds) {
+      renderSlot(slotId, playersBySlot[slotId]);
+    }
 
     const localPlayer = nextLobby.players[session?.playerId ?? 'P1'];
+    const p1 = playersBySlot.P1;
+    if (!isMultiplayer) {
+      return;
+    }
+
+    if (p1) {
+      slotEls.P1.textContent = `P1: ${p1.name} (${p1.ready ? 'Ready' : 'Not Ready'})${p1.connected ? '' : ' [disconnected]'}`;
+    } else if (localPlayer) {
+      slotEls.P1.textContent = `You (${localPlayer.name || ctx.playerName || 'Player'}) (${localPlayer.ready ? 'Ready' : 'Not Ready'})`;
+    }
+
     if (localPlayer) {
       readyButton.textContent = localPlayer.ready ? 'Set Not Ready' : 'Set Ready';
       readyButton.disabled = !localPlayer.connected;
@@ -898,13 +981,12 @@ function renderLobby(
       readyButton.disabled = true;
     }
 
-    const canStartAsHost = Boolean(
+    const canStartAsHost =
       session?.playerId === 'P1' &&
-      p1?.ready &&
-      p2?.ready &&
+      requiredSlots.every((entry) => entry !== null) &&
+      requiredSlots.every((entry) => entry?.ready) &&
       !nextLobby.started &&
-      !nextLobby.disconnectedPlayerId,
-    );
+      !nextLobby.disconnectedPlayerId;
 
     if (nextLobby.disconnectedPlayerId) {
       const reconnectMessage = formatPauseCountdown(
@@ -913,10 +995,11 @@ function renderLobby(
       );
       lobbyStatus.textContent = `Match paused: ${reconnectMessage}`;
     } else if (isMultiplayer) {
+      const requiredPlayers = opponentType === 'TEAM' ? 4 : 2;
       lobbyStatus.textContent =
-        p2 === null
-          ? 'Waiting for a second player to join.'
-          : 'Both players must be ready before host can start.';
+        joinedCount < requiredPlayers
+          ? `Waiting for ${requiredPlayers - joinedCount} player(s) to join.`
+          : 'All players joined. Everyone must be ready before host can start.';
     }
 
     startButton.disabled = isMultiplayer ? !canStartAsHost : !isReady;
@@ -965,7 +1048,7 @@ function renderLobby(
   const readyButton = createButton('Toggle Ready', () => {
     if (!isMultiplayer) {
       isReady = !isReady;
-      playerSlot.textContent = `Blue: ${ctx.playerName || 'Player'} (${isReady ? 'Ready' : 'Not Ready'})`;
+      slotEls.P1.textContent = `${ctx.playerName || 'Player'} (${isReady ? 'Ready' : 'Not Ready'})`;
       startButton.disabled = !isReady;
       return;
     }
@@ -1111,7 +1194,7 @@ function renderGame(
           username: ctx.playerName,
           mode: gameMode,
           playerId: localPlayerId,
-          winnerId: outcome.winnerId,
+          winnerId: outcome.playerWon ? localPlayerId : outcome.winnerId,
           playerMoney: outcome.playerMoney,
         });
       }
