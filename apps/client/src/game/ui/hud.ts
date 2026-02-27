@@ -365,30 +365,36 @@ export class HudLayer {
 
     const canVoteToSkipSummer = Boolean(
       player &&
-        opponent &&
         player.controller === 'HUMAN' &&
-        opponent.controller === 'HUMAN' &&
         state.season.logicSeason === 'SUMMER' &&
-        !state.match.ended,
+        !state.match.ended &&
+        state.playerOrder.length > 0,
     );
     this.skipSummerButton.style.display = canVoteToSkipSummer ? 'flex' : 'none';
     this.skipSummerStatus.style.display = canVoteToSkipSummer ? 'block' : 'none';
 
-    if (canVoteToSkipSummer && opponentId) {
+    if (canVoteToSkipSummer) {
       const playerVoted = state.summerSkipVotesByPlayerId[playerId] === true;
-      const opponentVoted = state.summerSkipVotesByPlayerId[opponentId] === true;
 
       this.skipSummerButton.disabled = playerVoted;
       this.skipSummerLabel.textContent = playerVoted ? 'vote locked' : 'skip summer';
 
-      if (playerVoted && opponentVoted) {
-        this.skipSummerStatus.textContent = 'Both voted. Skipping to winter.';
-      } else if (playerVoted) {
-        this.skipSummerStatus.textContent = 'Vote sent. Waiting for the other player.';
-      } else if (opponentVoted) {
+      if (playerVoted) {
+        if (state.playerOrder.length === 1) {
+          this.skipSummerStatus.textContent = 'Vote recorded. Summer skipped.';
+        } else {
+          const opponentVoted = opponentId ? state.summerSkipVotesByPlayerId[opponentId] === true : false;
+          if (opponentVoted) {
+            this.skipSummerStatus.textContent = 'Both voted. Skipping to winter.';
+          } else {
+            this.skipSummerStatus.textContent = 'Vote sent. Waiting for the other player.';
+          }
+        }
+      } else if (opponentId && state.summerSkipVotesByPlayerId[opponentId] === true) {
         this.skipSummerStatus.textContent = 'Other player voted. Click to agree and skip.';
       } else {
-        this.skipSummerStatus.textContent = 'Both players must vote to skip summer.';
+        this.skipSummerStatus.textContent =
+          state.playerOrder.length === 1 ? 'You can skip summer to winter.' : 'Both players must vote to skip summer.';
       }
     } else {
       this.skipSummerButton.disabled = true;

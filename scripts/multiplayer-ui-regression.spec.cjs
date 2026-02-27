@@ -263,8 +263,7 @@ test('solo flow: create, ready, start, action', async ({ browser }) => {
 
     await expect(page.getByRole('heading', { name: 'Lobby' })).toBeVisible();
     await expect(page.getByText('Mode: Solo')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Toggle Ready' }).click();
+    await expect(page.getByRole('button', { name: 'Start Match' })).toBeEnabled();
 
     const startButton = page.getByRole('button', { name: 'Start Match' });
     await expect(startButton).toBeEnabled();

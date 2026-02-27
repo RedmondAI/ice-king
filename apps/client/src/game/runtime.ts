@@ -1396,12 +1396,13 @@ export class GameRuntime {
     }
 
     const afterSeason = this.engine.getState().season.logicSeason;
+    const isSinglePlayer = this.engine.getState().playerOrder.length <= 1;
     if (beforeSeason === 'SUMMER' && afterSeason === 'WINTER') {
       this.hud.showToast('All players voted. Summer skipped.');
       return;
     }
 
-    this.hud.showToast('Vote recorded. Waiting for other players.');
+    this.hud.showToast(isSinglePlayer ? 'You can skip summer now if you wish.' : 'Vote recorded. Waiting for other players.');
   };
 
   private updateHud(): void {

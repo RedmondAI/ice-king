@@ -803,6 +803,7 @@ function renderLobby(
   clearRoot(ctx.root);
 
   const isMultiplayer = opponentType === 'HUMAN' || opponentType === 'FRIENDLY' || opponentType === 'TEAM';
+  const isSoloMode = opponentType === 'NONE';
   const isTeamMode = opponentType === 'TEAM';
   type LobbySlotId = keyof MultiplayerLobbyState['players'];
 
@@ -872,6 +873,9 @@ function renderLobby(
   if (!isMultiplayer) {
     slotEls.P1.textContent = `${ctx.playerName || 'Player'} (Not Ready)`;
   }
+  if (isSoloMode) {
+    slotEls.P1.textContent = `${ctx.playerName || 'Player'} (Ready)`;
+  }
 
   const renderSlot = (slotId: LobbySlotId, player: MultiplayerLobbyState['players'][LobbySlotId]): void => {
     const slot = slotEls[slotId];
@@ -889,13 +893,15 @@ function renderLobby(
   lobbyStatus.className = 'subtle';
   lobbyStatus.textContent = isMultiplayer
     ? 'Waiting for all players to join and ready up.'
-    : 'Toggle Ready then start the match.';
+    : isSoloMode
+      ? 'Single-player mode: Start Match to begin now.'
+      : 'Toggle Ready then start the match.';
 
   visibleSlotIds.forEach((slotId) => {
     slotPanel.append(slotEls[slotId]);
   });
 
-  let isReady = false;
+  let isReady = isSoloMode;
   let disposed = false;
   let pollId: number | null = null;
   let lobbyState = initialLobby;
@@ -1045,8 +1051,11 @@ function renderLobby(
     }
   };
 
-  const readyButton = createButton('Toggle Ready', () => {
+  const readyButton = createButton(isSoloMode ? 'Ready (Auto)' : 'Toggle Ready', () => {
     if (!isMultiplayer) {
+      if (isSoloMode) {
+        return;
+      }
       isReady = !isReady;
       slotEls.P1.textContent = `${ctx.playerName || 'Player'} (${isReady ? 'Ready' : 'Not Ready'})`;
       startButton.disabled = !isReady;
@@ -1086,7 +1095,7 @@ function renderLobby(
 
   const startButton = createButton('Start Match', () => {
     if (!isMultiplayer) {
-      if (!isReady) {
+      if (!isReady && !isSoloMode) {
         return;
       }
       safeRenderGame(null);
@@ -1120,6 +1129,13 @@ function renderLobby(
         }
       });
   }, !isMultiplayer);
+  if (isSoloMode) {
+    startButton.disabled = false;
+  }
+
+  if (isSoloMode) {
+    readyButton.disabled = true;
+  }
 
   const backButton = createButton('Back', () => {
     disposed = true;
