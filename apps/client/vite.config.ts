@@ -92,6 +92,7 @@ interface BotUsageResponse {
 }
 
 type MultiplayerPlayerId = 'P1' | 'P2' | 'P3' | 'P4';
+type TeamSide = 'BLUE' | 'RED';
 
 const MULTIPLAYER_PLAYER_IDS: MultiplayerPlayerId[] = ['P1', 'P2', 'P3', 'P4'];
 const TEAM_ROLES: Record<'TEAM' | 'OTHER', Record<MultiplayerPlayerId, 'BLUE' | 'RED'>> = {
@@ -113,6 +114,7 @@ interface MultiplayerRoomPlayer {
   id: MultiplayerPlayerId;
   name: string;
   token: string;
+  team: TeamSide | null;
   ready: boolean;
   connected: boolean;
   joinedAtMs: number;
@@ -136,10 +138,10 @@ interface MultiplayerLobbySnapshot {
   pausedAtMs: number | null;
   timeoutAtMs: number | null;
   players: {
-    P1: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
-    P2: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
-    P3: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
-    P4: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected'> | null;
+    P1: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected' | 'team'> | null;
+    P2: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected' | 'team'> | null;
+    P3: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected' | 'team'> | null;
+    P4: Pick<MultiplayerRoomPlayer, 'id' | 'name' | 'ready' | 'connected' | 'team'> | null;
   };
 }
 
@@ -417,6 +419,7 @@ function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
         name: room.players.P1.name,
         ready: room.players.P1.ready,
         connected: room.players.P1.connected,
+        team: room.players.P1.team,
       },
       P2: room.players.P2
         ? {
@@ -424,6 +427,7 @@ function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
             name: room.players.P2.name,
             ready: room.players.P2.ready,
             connected: room.players.P2.connected,
+            team: room.players.P2.team,
           }
         : null,
       P3: room.players.P3
@@ -432,6 +436,7 @@ function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
             name: room.players.P3.name,
             ready: room.players.P3.ready,
             connected: room.players.P3.connected,
+            team: room.players.P3.team,
           }
         : null,
       P4: room.players.P4
@@ -440,6 +445,7 @@ function toLobbySnapshot(room: MultiplayerRoom): MultiplayerLobbySnapshot {
             name: room.players.P4.name,
             ready: room.players.P4.ready,
             connected: room.players.P4.connected,
+            team: room.players.P4.team,
           }
         : null,
     },
@@ -495,12 +501,7 @@ function getStartingTeamAssignment(mode: MultiplayerRoom['mode']): Record<string
   }
 
   if (mode === 'TEAM') {
-    return {
-      P1: 'BLUE',
-      P2: 'BLUE',
-      P3: 'RED',
-      P4: 'RED',
-    };
+    return undefined;
   }
 
   return {
@@ -509,6 +510,75 @@ function getStartingTeamAssignment(mode: MultiplayerRoom['mode']): Record<string
     P3: 'FRIENDLY',
     P4: 'FRIENDLY',
   };
+}
+
+function getTeamAssignmentCounts(players: MultiplayerRoom['players']): {
+  blue: number;
+  red: number;
+  unassigned: number;
+} {
+  let blue = 0;
+  let red = 0;
+  let unassigned = 0;
+  const allPlayers: Array<MultiplayerRoomPlayer | null> = [
+    players.P1,
+    players.P2,
+    players.P3,
+    players.P4,
+  ];
+
+  for (const player of allPlayers) {
+    if (!player) {
+      continue;
+    }
+    if (player.team === 'BLUE') {
+      blue += 1;
+    } else if (player.team === 'RED') {
+      red += 1;
+    } else {
+      unassigned += 1;
+    }
+  }
+
+  return { blue, red, unassigned };
+}
+
+function isTeamModeBalanced(players: MultiplayerRoom['players']): boolean {
+  const counts = getTeamAssignmentCounts(players);
+  return counts.blue === 2 && counts.red === 2 && counts.unassigned === 0;
+}
+
+function setTeamInEngineState(engine: GameEngine, playerId: MultiplayerRoomPlayer['id'], team: TeamSide): void {
+  const state = engine.getState();
+  if (state.players[playerId]) {
+    state.players[playerId].color = team;
+    if (state.teamByPlayerId) {
+      state.teamByPlayerId[playerId] = team;
+    }
+  }
+}
+
+function applyTeamSelectionsToEngine(room: MultiplayerRoom): void {
+  if (room.mode !== 'TEAM') {
+    return;
+  }
+
+  const state = room.engine.getState();
+  state.teamByPlayerId = state.teamByPlayerId ?? {};
+
+  for (const playerId of MULTIPLAYER_PLAYER_IDS) {
+    const roomPlayer = room.players[playerId];
+    if (!roomPlayer || !state.players[playerId]) {
+      continue;
+    }
+    if (roomPlayer.team === 'RED' || roomPlayer.team === 'BLUE') {
+      setTeamInEngineState(room.engine, roomPlayer.id, roomPlayer.team);
+    }
+  }
+}
+
+function parseTeamSide(raw: unknown): TeamSide | null {
+  return raw === 'RED' || raw === 'BLUE' ? raw : null;
 }
 
 function makeRoomPlayers(hostPlayer: MultiplayerRoomPlayer): MultiplayerRoom['players'] {
@@ -729,6 +799,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           id: 'P1',
           name: playerName,
           token: playerToken(),
+          team: null,
           ready: false,
           connected: true,
           joinedAtMs: nowMs,
@@ -855,6 +926,7 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           id: joinId,
           name: sanitizePlayerName(body.playerName, `Player ${joinId}`),
           token: playerToken(),
+          team: null,
           ready: false,
           connected: true,
           joinedAtMs: nowMs,
@@ -905,6 +977,59 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
         }
 
         player.ready = Boolean(body.ready);
+        room.updatedAtMs = nowMs;
+        syncRoomPresence(room);
+        jsonResponse(res, 200, multiplayerRoomPayload(room, nowMs));
+        return;
+      }
+
+      if (path === '/team' && method === 'POST') {
+        const body = JSON.parse(await readBody(req, maxBodyBytes)) as Record<string, unknown>;
+        const roomCode = normalizeRoomCode(String(body.roomCode ?? ''));
+        const { room, expired, details } = getRoomIfFresh(rooms, roomCode, nowMs, roomTtlMs);
+        if (!room) {
+          jsonResponse(res, 404, {
+            error: expired ? 'ROOM_EXPIRED' : 'ROOM_NOT_FOUND',
+            ...(details ? { details } : {}),
+          });
+          return;
+        }
+        const player = findPlayerByToken(room, String(body.token ?? ''));
+        if (!player) {
+          jsonResponse(res, 401, { error: 'UNAUTHORIZED' });
+          return;
+        }
+
+        if (room.mode !== 'TEAM') {
+          jsonResponse(res, 400, { error: 'INVALID_REQUEST', details: 'Team selection is only available in Team mode.' });
+          return;
+        }
+        if (room.started) {
+          jsonResponse(res, 409, { error: 'MATCH_ALREADY_STARTED', details: 'Cannot change teams after match start.' });
+          return;
+        }
+
+        const requestedTeam = parseTeamSide(body.team);
+        if (!requestedTeam) {
+          jsonResponse(res, 400, { error: 'INVALID_TEAM_SELECTION', details: 'Team must be BLUE or RED.' });
+          return;
+        }
+
+        if (player.team !== requestedTeam) {
+          const teamCounts = getTeamAssignmentCounts(room.players);
+          const targetCount = requestedTeam === 'BLUE' ? teamCounts.blue : teamCounts.red;
+          if (targetCount >= 2) {
+            jsonResponse(res, 409, {
+              error: 'TEAM_SIDE_FULL',
+              details: `The ${requestedTeam} team already has 2 players.`,
+            });
+            return;
+          }
+          player.team = requestedTeam;
+        }
+
+        markPlayerHeartbeat(room, player, nowMs);
+        refreshDisconnectedState(room, nowMs);
         room.updatedAtMs = nowMs;
         syncRoomPresence(room);
         jsonResponse(res, 200, multiplayerRoomPayload(room, nowMs));
@@ -994,6 +1119,26 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
           });
           return;
         }
+
+        if (room.mode === 'TEAM') {
+          const teamCounts = getTeamAssignmentCounts(room.players);
+          if (!isTeamModeBalanced(room.players)) {
+            if (teamCounts.unassigned > 0) {
+              jsonResponse(res, 409, {
+                error: 'TEAM_NOT_FULLY_SELECTED',
+                details: 'Every player must select a team before start.',
+              });
+              return;
+            }
+            jsonResponse(res, 409, {
+              error: 'TEAM_NOT_BALANCED',
+              details: 'Both teams must have exactly two players before start.',
+            });
+            return;
+          }
+          applyTeamSelectionsToEngine(room);
+        }
+
         const readyPlayers = joinedPlayers.filter((entry) => entry.ready);
         if (readyPlayers.length < requiredPlayers) {
           jsonResponse(res, 409, { error: 'BOTH_PLAYERS_MUST_BE_READY', details: 'All players must be ready before starting.' });
@@ -1094,7 +1239,9 @@ function multiplayerMiddleware(env: EnvMap): Plugin {
         return;
       }
 
-      if (['/create', '/join', '/ready', '/start', '/state', '/action', '/chat'].includes(path)) {
+      if (
+        ['/create', '/join', '/ready', '/team', '/start', '/state', '/action', '/chat'].includes(path)
+      ) {
         jsonResponse(res, 405, { error: 'METHOD_NOT_ALLOWED' });
         return;
       }

@@ -9,10 +9,12 @@ import {
   fetchMultiplayerRoomState,
   getMultiplayerErrorCode,
   joinMultiplayerRoom,
+  setMultiplayerTeam,
   setMultiplayerReady,
   startMultiplayerRoom,
   type MultiplayerGameMode,
   type MultiplayerLobbyState,
+  type MultiplayerTeam,
   type MultiplayerSession,
 } from '../multiplayer/client';
 import {
@@ -215,6 +217,15 @@ function friendlyMultiplayerError(error: unknown): { code: string | null; messag
   }
   if (code === 'ROOM_CAPACITY_REACHED') {
     return { code, message: 'Server room capacity reached.' };
+  }
+  if (code === 'TEAM_SIDE_FULL') {
+    return { code, message: detailMessage.length > 0 ? detailMessage : 'That team already has 2 players.' };
+  }
+  if (code === 'TEAM_NOT_BALANCED') {
+    return { code, message: detailMessage.length > 0 ? detailMessage : 'Both team sides must have 2 players each.' };
+  }
+  if (code === 'TEAM_NOT_FULLY_SELECTED') {
+    return { code, message: detailMessage.length > 0 ? detailMessage : 'All players must select a team before starting.' };
   }
   if (code === 'BOTH_PLAYERS_MUST_BE_READY') {
     return { code, message: 'Both players must be ready before starting.' };
@@ -827,11 +838,47 @@ function renderLobby(
     return 'Play Online';
   };
 
-  const slotStyleForTeam = (slotId: LobbySlotId): string => {
-    if (isTeamMode) {
-      return slotId === 'P3' || slotId === 'P4' ? 'var(--red)' : 'var(--blue)';
+  const formatTeamLabel = (team: MultiplayerTeam | undefined): string => (team ?? 'Unassigned');
+
+  const slotColorForTeam = (team: MultiplayerTeam | undefined, slotId: LobbySlotId): string => {
+    if (team === 'RED') {
+      return 'var(--red)';
     }
-    return slotId === 'P1' ? 'var(--blue)' : 'var(--red)';
+    if (team === 'BLUE') {
+      return 'var(--blue)';
+    }
+    return slotId === 'P1' || slotId === 'P2' ? 'var(--blue)' : 'var(--red)';
+  };
+
+  const teamSelectionSummary = (players: {
+    P1: MultiplayerLobbyState['players']['P1'];
+    P2: MultiplayerLobbyState['players']['P2'];
+    P3: MultiplayerLobbyState['players']['P3'];
+    P4: MultiplayerLobbyState['players']['P4'];
+  }): {
+    blue: number;
+    red: number;
+    missing: number;
+    isBalanced: boolean;
+    isComplete: boolean;
+  } => {
+    const summary = { blue: 0, red: 0, missing: 0, isBalanced: false, isComplete: false };
+    const allPlayers = Object.values(players).filter((player): player is NonNullable<typeof player> => Boolean(player));
+    for (const player of allPlayers) {
+      if (!isTeamMode) {
+        continue;
+      }
+      if (player.team === 'RED') {
+        summary.red += 1;
+      } else if (player.team === 'BLUE') {
+        summary.blue += 1;
+      } else {
+        summary.missing += 1;
+      }
+    }
+    summary.isComplete = summary.missing === 0;
+    summary.isBalanced = summary.blue === 2 && summary.red === 2;
+    return summary;
   };
 
   const shell = document.createElement('div');
@@ -870,24 +917,89 @@ function renderLobby(
     }),
   ) as Record<LobbySlotId, HTMLDivElement>;
 
-  if (!isMultiplayer) {
-    slotEls.P1.textContent = `${ctx.playerName || 'Player'} (Not Ready)`;
-  }
-  if (isSoloMode) {
-    slotEls.P1.textContent = `${ctx.playerName || 'Player'} (Ready)`;
-  }
+  const setPlayerTeam = (team: MultiplayerTeam): void => {
+    if (!session || !lobbyState || disposed) {
+      return;
+    }
+    const me = lobbyState.players[session.playerId];
+    if (!me || !me.connected) {
+      return;
+    }
+    if (me.team === team) {
+      return;
+    }
 
-  const renderSlot = (slotId: LobbySlotId, player: MultiplayerLobbyState['players'][LobbySlotId]): void => {
+    void setMultiplayerTeam(session, team)
+      .then((response) => {
+        if (disposed) {
+          return;
+        }
+        applyLobbyState(response.lobby, response.state);
+      })
+      .catch((error) => {
+        const { code, message } = friendlyMultiplayerError(error);
+        if (code === 'UNAUTHORIZED' || code === 'ROOM_EXPIRED' || code === 'ROOM_NOT_FOUND') {
+          clearSessionAndExit(message, code);
+          return;
+        }
+        alert(`Team selection failed: ${message}`);
+      });
+  };
+
+  const renderSlot = (
+    slotId: LobbySlotId,
+    player: MultiplayerLobbyState['players'][LobbySlotId],
+    isLocalPlayer = false,
+  ): void => {
     const slot = slotEls[slotId];
-    slot.style.color = slotStyleForTeam(slotId);
+    slot.innerHTML = '';
+    slot.style.color = slotColorForTeam(player?.team, slotId);
+
+    const status = document.createElement('div');
     if (!player) {
-      slot.textContent = `${slotId}: Waiting for player...`;
+      status.textContent = `${slotId}: Waiting for player...`;
+      slot.append(status);
       return;
     }
 
     const connectedText = player.connected ? '' : ' [disconnected]';
-    slot.textContent = `${slotId}: ${player.name} (${player.ready ? 'Ready' : 'Not Ready'})${connectedText}`;
+    status.textContent = `${slotId}: ${player.name} (${player.ready ? 'Ready' : 'Not Ready'})${connectedText}`;
+
+    const team = document.createElement('div');
+    team.textContent = `Team: ${formatTeamLabel(player.team)}`;
+
+    slot.append(status, team);
+
+    if (!isTeamMode || !isLocalPlayer) {
+      return;
+    }
+
+    const controls = document.createElement('div');
+    controls.style.display = 'flex';
+    controls.style.gap = '8px';
+    controls.style.marginTop = '6px';
+
+    const blueButton = createButton('Join Blue', () => {
+      setPlayerTeam('BLUE');
+    });
+    blueButton.disabled = !player.connected || player.team === 'BLUE';
+
+    const redButton = createButton('Join Red', () => {
+      setPlayerTeam('RED');
+    });
+    redButton.disabled = !player.connected || player.team === 'RED';
+
+    controls.append(blueButton, redButton);
+    slot.append(controls);
   };
+
+  if (!isMultiplayer) {
+    slotEls.P1.innerHTML = `${ctx.playerName || 'Player'} (Not Ready)`;
+  }
+
+  if (isSoloMode) {
+    slotEls.P1.innerHTML = `${ctx.playerName || 'Player'} (Ready)`;
+  }
 
   const lobbyStatus = document.createElement('p');
   lobbyStatus.className = 'subtle';
@@ -962,21 +1074,15 @@ function renderLobby(
       ? [playersBySlot.P1, playersBySlot.P2, playersBySlot.P3, playersBySlot.P4]
       : [playersBySlot.P1, playersBySlot.P2];
     const joinedCount = requiredSlots.filter(Boolean).length;
+    const teamSummary = teamSelectionSummary(playersBySlot);
 
     for (const slotId of visibleSlotIds) {
-      renderSlot(slotId, playersBySlot[slotId]);
+      renderSlot(slotId, playersBySlot[slotId], session?.playerId === slotId);
     }
 
-    const localPlayer = nextLobby.players[session?.playerId ?? 'P1'];
-    const p1 = playersBySlot.P1;
+    const localPlayer = session ? nextLobby.players[session.playerId] : null;
     if (!isMultiplayer) {
       return;
-    }
-
-    if (p1) {
-      slotEls.P1.textContent = `P1: ${p1.name} (${p1.ready ? 'Ready' : 'Not Ready'})${p1.connected ? '' : ' [disconnected]'}`;
-    } else if (localPlayer) {
-      slotEls.P1.textContent = `You (${localPlayer.name || ctx.playerName || 'Player'}) (${localPlayer.ready ? 'Ready' : 'Not Ready'})`;
     }
 
     if (localPlayer) {
@@ -991,22 +1097,29 @@ function renderLobby(
       session?.playerId === 'P1' &&
       requiredSlots.every((entry) => entry !== null) &&
       requiredSlots.every((entry) => entry?.ready) &&
+      (!isTeamMode || (teamSummary.isComplete && teamSummary.isBalanced)) &&
       !nextLobby.started &&
       !nextLobby.disconnectedPlayerId;
 
-    if (nextLobby.disconnectedPlayerId) {
-      const reconnectMessage = formatPauseCountdown(
-        nextLobby.timeoutAtMs,
-        nextLobby.disconnectedPlayerId,
-      );
-      lobbyStatus.textContent = `Match paused: ${reconnectMessage}`;
-    } else if (isMultiplayer) {
-      const requiredPlayers = opponentType === 'TEAM' ? 4 : 2;
-      lobbyStatus.textContent =
-        joinedCount < requiredPlayers
-          ? `Waiting for ${requiredPlayers - joinedCount} player(s) to join.`
-          : 'All players joined. Everyone must be ready before host can start.';
-    }
+      if (nextLobby.disconnectedPlayerId) {
+        const reconnectMessage = formatPauseCountdown(
+          nextLobby.timeoutAtMs,
+          nextLobby.disconnectedPlayerId,
+        );
+        lobbyStatus.textContent = `Match paused: ${reconnectMessage}`;
+      } else if (isMultiplayer) {
+        const requiredPlayers = opponentType === 'TEAM' ? 4 : 2;
+        if (joinedCount < requiredPlayers) {
+          lobbyStatus.textContent = `Waiting for ${requiredPlayers - joinedCount} player(s) to join.`;
+        } else if (isTeamMode && !teamSummary.isComplete) {
+          lobbyStatus.textContent = `Team selection needed: ${teamSummary.missing} player(s) haven't picked a team yet.`;
+        } else if (isTeamMode && !teamSummary.isBalanced) {
+          lobbyStatus.textContent = `Team balance: Blue ${teamSummary.blue}, Red ${teamSummary.red}. Need 2 players each before start.`;
+        } else {
+          lobbyStatus.textContent =
+            'All players joined. Teams are balanced. Everyone must be ready before host can start.';
+        }
+      }
 
     startButton.disabled = isMultiplayer ? !canStartAsHost : !isReady;
     if (isMultiplayer) {

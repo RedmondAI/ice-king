@@ -39,7 +39,9 @@ Last updated: 2026-02-27
 - non-solo modes convert final money into Ice Coins;
 - `Friendly` and `Team` run with multiplayer sessions and team ownership:
   - `Friendly` players share ownership of all land but keep separate money/ice.
-  - `Team` runs in 4-player rooms with two players per team (`P1/P2` blue, `P3/P4` red), with map scale/pond count/house count doubled at room creation.
+  - `Team` runs in 4-player rooms with a selectable `Blue`/`Red` split, requiring exactly two players per team before start; lobby requires all players to pick sides.
+  - engine setup scales map size/pond count/house count by 2 for TEAM rooms.
+  - `/api/multiplayer/team` writes each player's preferred side and start applies the selected teams into game state.
 7. Frame loop:
 - Input handling (keys, map drag, minimap drag, two-step click tile behavior).
 - Fixed-step engine tick (local mode) or remote state sync poll (multiplayer mode).

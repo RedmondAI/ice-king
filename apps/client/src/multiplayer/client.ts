@@ -18,11 +18,14 @@ export interface MultiplayerChatMessage {
   sentAtMs: number;
 }
 
+export type MultiplayerTeam = 'BLUE' | 'RED';
+
 export interface MultiplayerLobbyPlayerState {
   id: MultiplayerPlayerId;
   name: string;
   ready: boolean;
   connected: boolean;
+  team?: MultiplayerTeam;
 }
 
 export type MultiplayerGameMode = 'PLAY_ONLINE' | 'FRIENDLY' | 'TEAM';
@@ -66,6 +69,12 @@ export interface MultiplayerReadyRequest {
   roomCode: string;
   token: string;
   ready: boolean;
+}
+
+export interface MultiplayerTeamRequest {
+  roomCode: string;
+  token: string;
+  team: MultiplayerTeam;
 }
 
 export interface MultiplayerStateQuery {
@@ -273,6 +282,17 @@ export async function setMultiplayerReady(
     roomCode: normalizeRoomCode(session.roomCode),
     token: session.token,
     ready,
+  });
+}
+
+export async function setMultiplayerTeam(
+  session: MultiplayerSession,
+  team: MultiplayerTeam,
+): Promise<MultiplayerReadyResponse> {
+  return postJson<MultiplayerReadyResponse>('/team', {
+    roomCode: normalizeRoomCode(session.roomCode),
+    token: session.token,
+    team,
   });
 }
 

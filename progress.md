@@ -23,6 +23,25 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
   - `npm run build` -> pass
   - `npm run test:multiplayer:ui` -> pass (`4 passed`)
 
+## 2026-02-27 (Milestone Update 42)
+- Completed TEAM mode team-selection and balancing constraints:
+  - added server endpoint `/api/multiplayer/team` for per-player Blue/Red team selection;
+  - TEAM rooms now reject start unless all four players are present, both sides have exactly two players, and all selections are made;
+  - server now propagates selected teams into the active game engine state before match start.
+- Updated lobby UI for TEAM mode:
+  - shows per-slot team assignment;
+  - host and guests can choose their own side with `Join Blue` / `Join Red`;
+  - start button remains disabled until team picks are complete and balanced.
+- Added/updated client transport and error mappings for new team errors:
+  - `MULTIPLAYER TEAM_SELECTION` API route in `apps/client/src/multiplayer/client.ts`;
+  - friendly error messages for `TEAM_SIDE_FULL`, `TEAM_NOT_BALANCED`, and `TEAM_NOT_FULLY_SELECTED`.
+- Updated multiplayer Playwright UI regression:
+  - TEAM flow now assigns teams before readying, verifies balanced split, and checks scaled map starts as expected (`22x22`).
+- Validation:
+  - `npm run test` -> pass
+  - `npm run build` -> pass
+  - `npm run test:multiplayer:ui` -> pass (`4 passed`)
+
 ## 2026-02-27 (Milestone Update 40)
 - Implemented `Friendly` mode creation from Create Game popup:
   - added mode-aware lobby mapping from server mode payloads;

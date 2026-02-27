@@ -9,7 +9,7 @@ Last updated: 2026-02-27
   - `Play Online` (two human players over `/api/multiplayer/*` room service).
   - `Solo` (single-player run with no active computer opponent).
   - `Friendly` (two-player mode with shared land ownership and separate player resources; requires `50` Ice Coins).
-  - `Team` (four-player team mode; map/pools/board are scaled up; requires `80` Ice Coins; currently in multiplayer).
+  - `Team` (four-player team mode; map/pools/board are scaled up; players select Blue/Red before start for a `2v2` split; requires `80` Ice Coins; currently in multiplayer).
   - `Ice Wars` is currently a locked placeholder.
 - `Join Game` remains available for joining existing online room codes.
 - Multiplayer authority currently runs in the Vite host process (in-memory, no persistent backend yet).
@@ -21,6 +21,7 @@ Last updated: 2026-02-27
 - Lobby contract:
   - `POST /api/multiplayer/create` returns host room session info and lobby snapshot.
   - `POST /api/multiplayer/join` joins a known room code and returns guest session.
+  - `POST /api/multiplayer/team` lets a TEAM-mode player choose `Blue` or `Red`.
   - `POST /api/multiplayer/ready` toggles readiness per player.
   - `POST /api/multiplayer/start` is host-gated (`P1` only), requires all players in the room and ready.
   - `GET /api/multiplayer/state` polls lobby and state.

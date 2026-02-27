@@ -424,12 +424,19 @@ test('team flow: create, join 3 players, ready, start, action', async ({ browser
     const guestCode3 = await readLobbyRoomCode(guest3);
     expect(guestCode3).toBe(roomCode);
 
+    const hostStart = host.getByRole('button', { name: 'Start Match' });
+    await expect(hostStart).toBeDisabled();
+
+    await host.getByRole('button', { name: 'Join Blue' }).click();
+    await guest1.getByRole('button', { name: 'Join Blue' }).click();
+    await guest2.getByRole('button', { name: 'Join Red' }).click();
+    await guest3.getByRole('button', { name: 'Join Red' }).click();
+
     await host.getByRole('button', { name: 'Set Ready' }).click();
     await guest1.getByRole('button', { name: 'Set Ready' }).click();
     await guest2.getByRole('button', { name: 'Set Ready' }).click();
     await guest3.getByRole('button', { name: 'Set Ready' }).click();
 
-    const hostStart = host.getByRole('button', { name: 'Start Match' });
     await expect(hostStart).toBeEnabled();
     await hostStart.click();
 
