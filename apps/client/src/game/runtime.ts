@@ -233,6 +233,7 @@ export class GameRuntime {
     this.canvas.id = 'game-canvas';
     this.canvas.tabIndex = 0;
     this.canvas.style.cursor = 'grab';
+    this.canvas.style.touchAction = 'none';
 
     this.multiplayerSession = options.multiplayerSession ?? null;
     this.playerId = this.multiplayerSession?.playerId ?? 'P1';

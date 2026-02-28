@@ -153,6 +153,7 @@ export class MinimapController implements IMinimapController {
 
     this.canvas.width = 220;
     this.canvas.height = 220;
+    this.canvas.style.touchAction = 'none';
 
     this.canvas.addEventListener('pointerdown', this.handleDown);
     this.canvas.addEventListener('pointermove', this.handleMove);
@@ -161,6 +162,11 @@ export class MinimapController implements IMinimapController {
 
   private handleDown = (event: PointerEvent): void => {
     this.dragging = true;
+    try {
+      this.canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may fail in unsupported environments.
+    }
     this.applyPointer(event);
   };
 

@@ -28,6 +28,8 @@ body,
   padding: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -57,6 +59,10 @@ input {
   justify-content: center;
   align-items: flex-end;
   padding: clamp(14px, 4vw, 40px);
+  padding: clamp(14px, 4vw, 40px) clamp(14px, 4vw, 40px)
+    calc(clamp(14px, 4vw, 40px) + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .splash-art-wrap {
@@ -183,12 +189,19 @@ input {
   justify-content: center;
   align-items: center;
   position: relative;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 .menu-card,
 .lobby-card,
 .end-card {
   width: min(960px, 94vw);
+  max-height: 94vh;
+  max-height: 94dvh;
+  overflow-y: auto;
   padding: 22px;
   border: 4px solid var(--ui-border);
   background: rgba(246, 231, 200, 0.95);
@@ -348,11 +361,13 @@ input {
 .game-shell {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
+  padding-right: clamp(250px, 38vw, 340px);
 }
 
 .game-stage {
@@ -497,6 +512,7 @@ input {
   background: #000;
   image-rendering: pixelated;
   z-index: 1;
+  touch-action: none;
 }
 
 .overlay-layer {
@@ -695,6 +711,7 @@ input {
   border: 3px solid #4e3a1f;
   image-rendering: pixelated;
   background: rgba(20, 50, 40, 0.15);
+  touch-action: none;
 }
 
 .debug-overlay {
@@ -785,20 +802,40 @@ input {
   pointer-events: none;
 }
 
-@media (max-width: 980px) {
+/* ── Tablet (≤1080px): side rail overlays on canvas ── */
+@media (max-width: 1080px) {
+  .game-shell {
+    padding-right: 0;
+  }
+
+  .game-stage {
+    width: min(1280px, 100vmin);
+    height: min(1280px, 100vmin);
+  }
+
   .splash-card {
     width: min(95vw, 700px);
+    max-height: 94vh;
+    max-height: 94dvh;
+    overflow-y: auto;
+  }
+
+  .menu-card,
+  .lobby-card,
+  .end-card {
+    max-height: 94vh;
+    max-height: 94dvh;
   }
 
   .game-logo-badge {
-    width: min(210px, 35vw);
+    width: min(180px, 28vw);
   }
 
   .game-side-rail {
     left: auto;
-    right: 14px;
-    top: 14px;
-    width: min(250px, 66vw);
+    right: 10px;
+    top: 10px;
+    width: min(230px, 46vw);
   }
 
   .game-side-rail .hud,
@@ -807,30 +844,40 @@ input {
   }
 
   .minimap-frame {
-    width: 190px;
-    height: 190px;
+    width: 180px;
+    height: 180px;
   }
 
   .game-chat-rail {
-    left: 14px;
-    top: 14px;
-    height: calc(100% - 28px);
-    width: min(240px, 56vw);
+    left: 10px;
+    top: 10px;
+    height: calc(100% - 20px);
+    width: min(230px, 46vw);
   }
 }
 
+/* ── Mobile / small tablet (≤720px) ── */
 @media (max-width: 720px) {
   .splash-screen {
     align-items: flex-end;
-    padding: 12px;
+    padding: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .splash-card {
+    width: min(98vw, 560px);
+    max-height: 92vh;
+    max-height: 92dvh;
+    overflow-y: auto;
+    padding: clamp(10px, 2.5vw, 18px);
   }
 
   .splash-title {
-    font-size: clamp(28px, 12vw, 44px);
+    font-size: clamp(22px, 8vw, 36px);
   }
 
   .splash-logo {
-    width: min(420px, 95%);
+    width: min(380px, 92%);
   }
 
   .splash-subtitle {
@@ -844,35 +891,194 @@ input {
   .splash-button-row {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .splash-button-row .pixel-button {
     min-width: 0;
+    min-height: 48px;
+    font-size: 12px;
   }
 
-  .hud {
-    width: min(250px, 66vw);
+  .pixel-button {
+    min-height: 48px;
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+
+  .text-input {
+    min-height: 48px;
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .menu-card,
+  .lobby-card,
+  .end-card {
+    width: min(98vw, 560px);
+    max-height: 92vh;
+    max-height: 92dvh;
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .menu-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .title {
+    font-size: clamp(20px, 7vw, 36px);
+  }
+
+  .mode-picker-card {
+    width: min(96vw, 560px);
+    max-height: 88vh;
+    max-height: 88dvh;
+    padding: 10px;
+  }
+
+  .mode-picker-option {
+    min-height: 48px;
+  }
+
+  /* Game layout: canvas fills viewport, HUD overlays */
+  .game-shell {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .game-stage {
+    width: 100vw;
+    height: 100vw;
+    max-height: 100vh;
+    max-height: 100dvh;
   }
 
   .game-logo-badge {
-    width: min(160px, 42vw);
-    left: 10px;
-    top: 10px;
+    width: min(130px, 32vw);
+    left: 8px;
+    top: 8px;
+  }
+
+  .game-side-rail {
+    left: auto;
+    right: 8px;
+    top: 8px;
+    width: min(200px, 52vw);
+  }
+
+  .hud {
+    width: 100%;
+  }
+
+  .minimap-frame {
+    width: 140px;
+    height: 140px;
   }
 
   .game-chat-rail {
-    left: 10px;
-    top: 10px;
-    height: calc(100% - 20px);
-    width: min(220px, 58vw);
+    left: 8px;
+    top: 8px;
+    height: calc(100% - 16px);
+    width: min(200px, 52vw);
     padding: 8px;
   }
 
   .season-bar {
     min-width: 0;
-    width: calc(100% - 20px);
+    width: calc(100% - 16px);
     left: 50%;
     transform: translateX(-50%);
-    bottom: 10px;
+    bottom: 8px;
+    font-size: 9px;
+    padding: 6px;
+  }
+
+  .popup {
+    min-width: 180px;
+    max-width: 250px;
+  }
+
+  .toast {
+    font-size: 10px;
+    max-width: 90vw;
+  }
+
+  .account-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Very small phones (≤480px) ── */
+@media (max-width: 480px) {
+  .game-side-rail {
+    width: min(180px, 56vw);
+  }
+
+  .minimap-frame {
+    width: 120px;
+    height: 120px;
+  }
+
+  .game-logo-badge {
+    width: min(110px, 28vw);
+  }
+
+  .hud-body {
+    font-size: 9px;
+    padding: 8px;
+    gap: 5px;
+  }
+
+  .hud-title {
+    font-size: 10px;
+  }
+
+  .instructions-body {
+    max-height: 140px;
+    font-size: 8px;
+  }
+}
+
+/* ── Landscape phones: prioritize width for square canvas ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .game-stage {
+    width: min(1280px, 100vh);
+    width: min(1280px, 100dvh);
+    height: min(1280px, 100vh);
+    height: min(1280px, 100dvh);
+  }
+
+  .game-side-rail {
+    right: 6px;
+    top: 6px;
+    width: min(180px, 30vw);
+  }
+
+  .minimap-frame {
+    width: 110px;
+    height: 110px;
+  }
+
+  .game-logo-badge {
+    width: min(100px, 14vw);
+    left: 6px;
+    top: 6px;
+  }
+
+  .season-bar {
+    bottom: 4px;
+    padding: 4px 8px;
+    font-size: 8px;
+  }
+
+  .splash-card {
+    max-height: 90vh;
+    max-height: 90dvh;
   }
 }
