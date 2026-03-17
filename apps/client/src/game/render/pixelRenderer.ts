@@ -480,9 +480,6 @@ export class PixelRenderer {
         }
 
         // Special overlays for war tiles
-        if (tile.type === 'WAR_FACTORY') {
-          drawWarFactoryBadge(this.ctx, px, py);
-        }
         if (tile.type === 'CRATER') {
           drawCraterOverlay(this.ctx, px, py);
         }

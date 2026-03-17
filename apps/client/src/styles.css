@@ -964,44 +964,71 @@ input {
   overflow: hidden;
 }
 
+/*
+  Pixel-art warrior figure using a 10×18 CSS sprite layout.
+  Each warrior is a stacked set of boxes: head, torso/arms, legs.
+  Steps(4) animation gives a crisp 4-frame walk cycle.
+*/
 .warrior-figure {
-  width: 8px;
-  height: 14px;
+  width: 10px;
+  height: 18px;
   position: relative;
   display: inline-block;
-  animation: warrior-walk 0.6s steps(2) infinite;
+  image-rendering: pixelated;
+  animation: warrior-walk 0.5s steps(4, end) infinite;
 }
 
+/* legs */
+.warrior-figure::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 1px;
+  width: 8px;
+  height: 7px;
+  background: inherit;
+  opacity: 0.85;
+}
+
+/* torso */
 .warrior-figure-blue {
-  background: var(--blue);
-  box-shadow: 0 0 0 1px #1a5aaa;
+  background:
+    /* sword arm (right) */
+    linear-gradient(var(--blue), var(--blue)) 8px 5px / 3px 6px no-repeat,
+    /* shield arm (left) */
+    linear-gradient(#4488cc, #4488cc) -1px 5px / 3px 5px no-repeat,
+    /* torso */
+    linear-gradient(#2266aa, #3377cc) 0px 5px / 10px 8px no-repeat,
+    /* head */
+    linear-gradient(#aaddff, #88bbee) 1px 0px / 8px 6px no-repeat;
+  /* helmet spike */
+  box-shadow:
+    4px -3px 0 1px #aaddff,
+    0 0 0 1px #1a4a88;
 }
 
 .warrior-figure-red {
-  background: var(--red);
-  box-shadow: 0 0 0 1px #8a1111;
+  background:
+    linear-gradient(var(--red), var(--red)) 8px 5px / 3px 6px no-repeat,
+    linear-gradient(#cc4444, #cc4444) -1px 5px / 3px 5px no-repeat,
+    linear-gradient(#aa2222, #cc3333) 0px 5px / 10px 8px no-repeat,
+    linear-gradient(#ffaaaa, #ff8888) 1px 0px / 8px 6px no-repeat;
+  box-shadow:
+    4px -3px 0 1px #ffaaaa,
+    0 0 0 1px #881111;
 }
 
-.warrior-figure::before {
-  content: '';
-  position: absolute;
-  top: -4px;
-  left: 1px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: inherit;
-}
-
-.warrior-figure-blue::before { background: #99d4ff; }
-.warrior-figure-red::before { background: #ffaaaa; }
+/* legs colouring per team */
+.warrior-figure-blue::after { background: #2255aa; }
+.warrior-figure-red::after  { background: #991111; }
 
 @keyframes warrior-walk {
-  0% { transform: translateX(0) scaleX(1); }
-  25% { transform: translateX(2px) scaleX(1); }
-  50% { transform: translateX(0) scaleX(-1); }
-  75% { transform: translateX(-2px) scaleX(-1); }
-  100% { transform: translateX(0) scaleX(1); }
+  /* 4 frames: stride right, neutral, stride left, neutral */
+  0%   { transform: translateY(0)   scaleX(1);  }
+  25%  { transform: translateY(-1px) scaleX(1);  }
+  50%  { transform: translateY(0)   scaleX(-1); }
+  75%  { transform: translateY(-1px) scaleX(-1); }
+  100% { transform: translateY(0)   scaleX(1);  }
 }
 
 .warrior-overflow {
@@ -1042,67 +1069,98 @@ input {
   50% { transform: rotate(6deg); }
 }
 
-/* ── Nuke Explosion Animation ───────────────────────────────────────── */
+/* ── Nuke Explosion Animation (pixel-art ice burst) ─────────────────── */
 
 .nuke-explosion {
   position: absolute;
   pointer-events: none;
-  overflow: hidden;
+  image-rendering: pixelated;
   z-index: 200;
-  animation: nuke-fade 2.2s ease-out forwards;
+  animation: nuke-fade 2.0s steps(1) forwards;
 }
 
 @keyframes nuke-fade {
-  0% { opacity: 1; }
-  70% { opacity: 1; }
+  0%   { opacity: 1; }
+  75%  { opacity: 1; }
+  88%  { opacity: 0.5; }
   100% { opacity: 0; }
 }
 
+/* Flash-white tile overlay — the "impact" frame */
 .nuke-core {
   position: absolute;
-  inset: 20%;
-  border-radius: 50%;
-  background: radial-gradient(circle, #ffffff 0%, #a8f4ff 30%, #00d4ff 60%, #0055ff 90%, transparent 100%);
-  animation: nuke-core-burst 2.2s ease-out forwards;
+  inset: 0;
+  /* Chunky pixel-art concentric squares instead of a smooth circle */
+  background:
+    /* white centre (16×16) */
+    linear-gradient(#ffffff, #ffffff) 44% 44% / 12% 12% no-repeat,
+    /* ice-blue mid ring */
+    linear-gradient(#88eeff, #88eeff) 30% 30% / 40% 40% no-repeat,
+    /* deep blue outer ring */
+    linear-gradient(#0066cc, #0066cc) 18% 18% / 64% 64% no-repeat,
+    /* dark border */
+    linear-gradient(#003388, #003388) 10% 10% / 80% 80% no-repeat,
+    /* frost halo */
+    radial-gradient(circle, rgba(170,240,255,0.55) 0%, transparent 70%);
+  animation: nuke-core-burst 2.0s steps(6, end) forwards;
 }
 
 @keyframes nuke-core-burst {
-  0% { transform: scale(0.1); opacity: 1; }
-  15% { transform: scale(1.6); opacity: 1; }
-  40% { transform: scale(1.0); opacity: 0.9; }
-  100% { transform: scale(0.4); opacity: 0; }
+  0%   { transform: scale(0.05); opacity: 1; }
+  12%  { transform: scale(1.8);  opacity: 1; }
+  28%  { transform: scale(1.2);  opacity: 1; }
+  55%  { transform: scale(1.4);  opacity: 0.8; }
+  100% { transform: scale(0.6);  opacity: 0; }
 }
 
+/* Expanding pixel-art square ring */
 .nuke-ring {
   position: absolute;
-  inset: -10%;
-  border-radius: 50%;
-  border: 6px solid rgba(0, 212, 255, 0.8);
-  animation: nuke-ring-expand 1s ease-out forwards;
+  inset: 10%;
+  /* Simulate a chunky 4px border as a pixel square */
+  outline: 5px solid rgba(0, 210, 255, 0.9);
+  outline-offset: 0;
+  /* No border-radius — keep it angular / pixel-art */
+  animation: nuke-ring-expand 0.8s steps(8, end) forwards;
 }
 
 @keyframes nuke-ring-expand {
-  0% { transform: scale(0.2); opacity: 1; }
-  100% { transform: scale(2.5); opacity: 0; }
+  0%   { transform: scale(0.1); opacity: 1; outline-color: rgba(255,255,255,0.95); }
+  30%  { transform: scale(1.2); opacity: 1; outline-color: rgba(100,220,255,0.9); }
+  60%  { transform: scale(2.0); opacity: 0.6; outline-color: rgba(0,150,220,0.6); }
+  100% { transform: scale(3.2); opacity: 0; }
 }
 
+/* Ice shards — pixel rectangles flung outward */
 .nuke-shard {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 6px;
-  height: 14px;
-  margin: -7px -3px;
-  background: linear-gradient(180deg, #ffffff, #5af0ff);
-  border: 1px solid #00aaee;
+  /* Wider, chunkier shard to read as pixel art */
+  width: 8px;
+  height: 18px;
+  margin: -9px -4px;
+  /* Two-tone pixel gradient: white tip, ice body, dark base */
+  background:
+    linear-gradient(180deg,
+      #ffffff   0%,
+      #ffffff  16%,
+      #aaeeff  17%,
+      #55ccff  50%,
+      #0088cc  80%,
+      #004488 100%);
+  outline: 1px solid #003366;
+  image-rendering: pixelated;
   transform-origin: center bottom;
   transform: rotate(var(--angle));
-  animation: nuke-shard-fly 0.9s ease-out forwards;
+  animation: nuke-shard-fly 0.75s steps(8, end) forwards;
 }
 
 @keyframes nuke-shard-fly {
-  0% { transform: rotate(var(--angle)) translateY(0) scale(1); opacity: 1; }
-  100% { transform: rotate(var(--angle)) translateY(-60px) scale(0.2); opacity: 0; }
+  0%   { transform: rotate(var(--angle)) translateY(0px)   scale(1.0); opacity: 1;   }
+  40%  { transform: rotate(var(--angle)) translateY(-40px) scale(0.9); opacity: 1;   }
+  70%  { transform: rotate(var(--angle)) translateY(-65px) scale(0.6); opacity: 0.7; }
+  100% { transform: rotate(var(--angle)) translateY(-80px) scale(0.2); opacity: 0;   }
 }
 
 /* ── Tablet (≤1080px): side rail overlays on canvas ── */

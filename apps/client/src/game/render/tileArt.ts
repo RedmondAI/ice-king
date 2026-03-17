@@ -12,6 +12,8 @@ import factorySummerUrl from '../../assets/tiles256/factory-summer.png';
 import factoryWinterUrl from '../../assets/tiles256/factory-winter.png';
 import trainSummerUrl from '../../assets/tiles256/train-summer.png';
 import trainWinterUrl from '../../assets/tiles256/train-winter.png';
+import warFactorySummerUrl from '../../assets/tiles256/war-factory-summer.png';
+import warFactoryWinterUrl from '../../assets/tiles256/war-factory-winter.png';
 
 import grassTransitionUrl from '../../assets/tiles-transition256/grass-transition-winter-to-summer-grid.png';
 import forestTransitionUrl from '../../assets/tiles-transition256/forest-transition-winter-to-summer-grid.png';
@@ -19,6 +21,7 @@ import pondTransitionUrl from '../../assets/tiles-transition256/pond-transition-
 import houseTransitionUrl from '../../assets/tiles-transition256/house-transition-winter-to-summer-grid.png';
 import factoryTransitionUrl from '../../assets/tiles-transition256/factory-transition-winter-to-summer-grid.png';
 import trainTransitionUrl from '../../assets/tiles-transition256/train-transition-winter-to-summer-grid.png';
+import warFactoryTransitionUrl from '../../assets/tiles-transition256/war-factory-transition-winter-to-summer-grid.png';
 
 type ArtTileType = 'GRASS' | 'FOREST' | 'POND' | 'HOUSE' | 'FACTORY' | 'TRAIN' | 'WAR_FACTORY' | 'CRATER';
 
@@ -114,8 +117,7 @@ export class TileArtLibrary {
       HOUSE: buildBundle(houseSummerUrl, houseWinterUrl, houseTransitionUrl),
       FACTORY: buildBundle(factorySummerUrl, factoryWinterUrl, factoryTransitionUrl),
       TRAIN: buildBundle(trainSummerUrl, trainWinterUrl, trainTransitionUrl),
-      // War factory reuses factory art (overlay added in renderer)
-      WAR_FACTORY: buildBundle(factorySummerUrl, factoryWinterUrl, factoryTransitionUrl),
+      WAR_FACTORY: buildBundle(warFactorySummerUrl, warFactoryWinterUrl, warFactoryTransitionUrl),
       // Crater reuses grass art (tinted dark in renderer)
       CRATER: buildBundle(grassSummerUrl, grassWinterUrl, grassTransitionUrl),
     };
