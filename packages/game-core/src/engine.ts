@@ -20,6 +20,16 @@ import {
   startFactoryCraft,
   updateFactoryJobs,
 } from './systems/structureSystem';
+import {
+  buildWarFactory,
+  collectWarCraftJob,
+  commitWarriorsToBattle,
+  nukeEnemyTile,
+  startWarBattle,
+  startWarCraft,
+  updateWarBattle,
+  updateWarCraftJobs,
+} from './systems/warSystem';
 import { forceSeasonFlip, updateSeasonClock, type SeasonFlip } from './systems/seasonSystem';
 import { evaluateTimeWin, forfeitMatch, syncTrainYear } from './systems/winConditionSystem';
 import { chooseHeuristicBotAction, enumerateCandidateBotActions, tickBots } from './systems/botSystem';
@@ -149,6 +159,8 @@ export class GameEngine {
 
       updatePondHarvestJobs(this.state);
       updateFactoryJobs(this.state);
+      updateWarCraftJobs(this.state);
+      updateWarBattle(this.state, this.config);
       syncTrainYear(this.state);
 
       if (this.botControlMode === 'INTERNAL_HEURISTIC') {
@@ -404,6 +416,24 @@ export class GameEngine {
             winnerId: this.state.match.winnerId,
           },
         };
+        break;
+      case 'tile.buildWarFactory':
+        result = buildWarFactory(this.state, this.config, action.playerId, action.x, action.y);
+        break;
+      case 'war.craft.start':
+        result = startWarCraft(this.state, this.config, action.playerId, action.x, action.y, action.kind);
+        break;
+      case 'war.craft.collect':
+        result = collectWarCraftJob(this.state, action.playerId, action.jobId);
+        break;
+      case 'war.nuke':
+        result = nukeEnemyTile(this.state, action.playerId, action.x, action.y);
+        break;
+      case 'war.battle.start':
+        result = startWarBattle(this.state, this.config, action.playerId);
+        break;
+      case 'war.battle.commit':
+        result = commitWarriorsToBattle(this.state, action.playerId, action.count);
         break;
       default:
         result = { ok: false, code: 'INVALID_ACTION', message: 'Unsupported action.' };

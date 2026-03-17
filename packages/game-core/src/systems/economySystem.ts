@@ -41,6 +41,10 @@ export function buyUnownedTile(
     return { ok: false, code: 'INVALID_ACTION', message: 'Border tiles cannot be purchased.' };
   }
 
+  if (tile.type === 'CRATER') {
+    return { ok: false, code: 'INVALID_ACTION', message: 'Crater tiles cannot be purchased.' };
+  }
+
   if (tile.ownerId !== null && isTileOwnedByPlayerOrTeammate(state, tile.ownerId, playerId)) {
     return { ok: false, code: 'ALREADY_OWNER', message: 'Tile is already owned by this player.' };
   }
@@ -101,6 +105,10 @@ export function buyOwnedTile(
 
   if (tile.type === 'VOID') {
     return { ok: false, code: 'INVALID_ACTION', message: 'Border tiles cannot be purchased.' };
+  }
+
+  if (tile.type === 'CRATER') {
+    return { ok: false, code: 'INVALID_ACTION', message: 'Crater tiles cannot be purchased.' };
   }
 
   if (tile.ownerId === null) {

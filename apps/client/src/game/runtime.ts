@@ -180,6 +180,11 @@ export class GameRuntime {
   private chatEmojiOpen = false;
   private chatMessages: MultiplayerChatMessage[] = [];
 
+  // Nuke animations: { x, y, startMs, durationMs, node }
+  private readonly nukeAnimations: Array<{
+    x: number; y: number; startMs: number; durationMs: number; node: HTMLDivElement;
+  }> = [];
+
   private getStatePlayerColor(playerId: string): 'BLUE' | 'RED' | null {
     const state = this.engine.getState();
     const player = state.players[playerId];
@@ -422,6 +427,10 @@ export class GameRuntime {
       this.handleSkipSummerVote,
     );
     this.hud.setOpponentStatsVisible(options.opponentType !== 'NONE');
+    this.hud.setWarCallbacks(
+      () => this.handleWarButtonClick(),
+      (count) => this.handleWarCommitClick(count),
+    );
 
     this.minimap = new MinimapController(this.minimapCanvas, (x, y) => {
       this.dispatchAction({
@@ -818,6 +827,13 @@ export class GameRuntime {
       }
     }
 
+    if (result.ok && action.type === 'war.nuke') {
+      this.spawnNukeAnimation(action.x, action.y);
+      this.hud.showToast('💥 NUKE LAUNCHED! Tile obliterated!');
+      this.actionPanelTile = null;
+      this.hud.setPondPopup(null);
+    }
+
     this.updateActionPanel();
   };
 
@@ -902,8 +918,26 @@ export class GameRuntime {
         return { type: 'structure.factory.craftBlueIce', playerId: this.playerId, x, y };
       case 'train-sale':
         return { type: 'structure.train.sellAnnualShipment', playerId: this.playerId, x, y };
-      default:
+      case 'build-war-factory':
+        return { type: 'tile.buildWarFactory', playerId: this.playerId, x, y };
+      case 'war-craft-nuke':
+        return { type: 'war.craft.start', playerId: this.playerId, x, y, kind: 'NUKE' };
+      case 'war-craft-warriors':
+        return { type: 'war.craft.start', playerId: this.playerId, x, y, kind: 'WARRIORS' };
+      case 'war-nuke-tile':
+        return { type: 'war.nuke', playerId: this.playerId, x, y };
+      default: {
+        // Dynamic war craft collect: war-collect-<jobId>
+        const state = this.engine.getState();
+        if (actionId.startsWith('war-collect-')) {
+          const jobId = actionId.slice('war-collect-'.length);
+          const job = state.warCraftJobs.find((j) => j.id === jobId && j.status === 'COMPLETE');
+          if (job) {
+            return { type: 'war.craft.collect', playerId: this.playerId, jobId };
+          }
+        }
         return null;
+      }
     }
   }
 
@@ -1296,6 +1330,7 @@ export class GameRuntime {
     if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && (tile.type === 'GRASS' || tile.type === 'FOREST')) {
       actions.push({ id: 'build-factory', label: 'Build Factory (2 ice + $2c)' });
       actions.push({ id: 'build-pond', label: 'Build Man-Made Pond (1 ice + $2c)' });
+      actions.push({ id: 'build-war-factory', label: 'Build War Factory (1 blue ice + $2c)' });
     }
 
     if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'POND') {
@@ -1331,6 +1366,38 @@ export class GameRuntime {
     if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'FACTORY') {
       actions.push({ id: 'craft-fridge', label: 'Craft Refrigerator (2 ice + $2c / 2m)' });
       actions.push({ id: 'craft-blue', label: 'Craft Blue Ice (2 ice + $2c / 2m)' });
+    }
+
+    if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'WAR_FACTORY') {
+      const activeWarJob = state.warCraftJobs.find(
+        (j) => j.x === tile.x && j.y === tile.y && j.status === 'ACTIVE',
+      );
+      const completeWarJob = state.warCraftJobs.find(
+        (j) => j.x === tile.x && j.y === tile.y && j.status === 'COMPLETE',
+      );
+      if (activeWarJob) {
+        const remaining = Math.max(0, activeWarJob.completesAtMs - state.nowMs);
+        const min = Math.floor(remaining / 60000);
+        const sec = Math.floor((remaining % 60000) / 1000).toString().padStart(2, '0');
+        actions.push({ id: 'war-craft-busy', label: `Crafting ${activeWarJob.kind}... ${min}:${sec}`, disabled: true });
+      } else if (completeWarJob) {
+        actions.push({ id: `war-collect-${completeWarJob.id}`, label: `Collect ${completeWarJob.kind} ✓` });
+      } else {
+        actions.push({ id: 'war-craft-nuke', label: `Craft Nuke (2 blue ice + $2c / 4m)` });
+        actions.push({ id: 'war-craft-warriors', label: `Craft Warriors x2 (1 blue ice + $1c / 1m)` });
+      }
+    }
+
+    // Nuke action: appears when hovering an ENEMY tile and local player has a nuke
+    if (
+      tile.ownerId &&
+      !this.isTileOwnedByPlayerOrTeammate(tile.ownerId) &&
+      tile.type !== 'CRATER'
+    ) {
+      const localPlayer = state.players[this.playerId];
+      if (localPlayer && localPlayer.nukes > 0) {
+        actions.push({ id: 'war-nuke-tile', label: `☢ NUKE THIS TILE (${localPlayer.nukes} left)` });
+      }
     }
 
     if (this.isTileOwnedByPlayerOrTeammate(tile.ownerId) && tile.type === 'TRAIN') {
@@ -1386,6 +1453,65 @@ export class GameRuntime {
     return this.canvasToOverlayPoint(tilePoint.x + TILE_SIZE / 2, tilePoint.y + TILE_SIZE / 2);
   }
 
+  private handleWarButtonClick(): void {
+    const result = this.dispatchAction({ type: 'war.battle.start', playerId: this.playerId });
+    if (result.ok) {
+      this.hud.showToast('WAR HAS BEGUN! Commit warriors now!');
+    }
+    this.updateActionPanel();
+  }
+
+  private handleWarCommitClick(count: number): void {
+    const result = this.dispatchAction({ type: 'war.battle.commit', playerId: this.playerId, count });
+    if (result.ok) {
+      this.hud.showToast(`${count} warrior${count === 1 ? '' : 's'} sent to battle!`);
+    }
+    this.updateActionPanel();
+  }
+
+  private spawnNukeAnimation(tileX: number, tileY: number): void {
+    const state = this.engine.getState();
+    const tilePoint = tileToScreen(state, this.playerId, tileX, tileY);
+    const overlayPoint = this.canvasToOverlayPoint(tilePoint.x, tilePoint.y);
+
+    const node = document.createElement('div');
+    node.className = 'nuke-explosion';
+    node.style.left = `${overlayPoint.x}px`;
+    node.style.top = `${overlayPoint.y}px`;
+    node.style.width = `${TILE_SIZE}px`;
+    node.style.height = `${TILE_SIZE}px`;
+    this.gameLayer.append(node);
+
+    // Core flash
+    const core = document.createElement('div');
+    core.className = 'nuke-core';
+    node.append(core);
+
+    // Ice shards
+    for (let i = 0; i < 8; i++) {
+      const shard = document.createElement('div');
+      shard.className = 'nuke-shard';
+      const angle = (i / 8) * 360;
+      shard.style.setProperty('--angle', `${angle}deg`);
+      shard.style.animationDelay = `${i * 0.04}s`;
+      node.append(shard);
+    }
+
+    // Frost wave ring
+    const ring = document.createElement('div');
+    ring.className = 'nuke-ring';
+    node.append(ring);
+
+    const durationMs = 2200;
+    this.nukeAnimations.push({ x: tileX, y: tileY, startMs: state.nowMs, durationMs, node });
+
+    window.setTimeout(() => {
+      node.remove();
+      const idx = this.nukeAnimations.findIndex((a) => a.x === tileX && a.y === tileY);
+      if (idx >= 0) this.nukeAnimations.splice(idx, 1);
+    }, durationMs + 200);
+  }
+
   private handleSkipSummerVote = (): void => {
     const beforeSeason = this.engine.getState().season.logicSeason;
     const result = this.dispatchAction({
@@ -1410,6 +1536,12 @@ export class GameRuntime {
     const split = this.engine.getPlayerStorage(this.playerId);
     const state = this.engine.getState();
     const opponentId = this.getOpponentPlayerId();
+
+    // Update war panel
+    const pendingWarJobs = state.warCraftJobs.filter(
+      (j) => j.ownerId === this.playerId && (j.status === 'ACTIVE' || j.status === 'COMPLETE'),
+    );
+    this.hud.updateWarPanel(state, this.playerId, state.nowMs, pendingWarJobs);
     const opponentSplit = opponentId ? this.engine.getPlayerStorage(opponentId) : null;
     const runtimeMode = this.multiplayerSession
       ? 'MULTIPLAYER'

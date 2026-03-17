@@ -44,12 +44,70 @@ function drawFallbackTile(ctx: CanvasRenderingContext2D, tile: TileState, x: num
     base = '#4d5c54';
   } else if (tile.type === 'HOUSE') {
     base = '#d99d5b';
-  } else if (tile.type === 'FACTORY') {
+  } else if (tile.type === 'FACTORY' || tile.type === 'WAR_FACTORY') {
     base = '#9c748a';
   } else if (tile.type === 'TRAIN') {
     base = '#f0b35a';
+  } else if (tile.type === 'CRATER') {
+    base = '#2d2d2d';
   }
   drawPixelRect(ctx, x, y, TILE_SIZE, TILE_SIZE, base);
+}
+
+function drawWarFactoryBadge(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  // Red war badge in top-right corner
+  const badgeSize = 24;
+  const bx = x + TILE_SIZE - badgeSize - 4;
+  const by = y + 4;
+  ctx.fillStyle = '#cc1111';
+  ctx.fillRect(Math.round(bx), Math.round(by), badgeSize, badgeSize);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⚔', Math.round(bx + badgeSize / 2), Math.round(by + badgeSize / 2));
+}
+
+function drawCraterOverlay(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  // Dark semi-transparent overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(Math.round(x), Math.round(y), TILE_SIZE, TILE_SIZE);
+
+  // Crater pattern: concentric dark rings with ice-blue cracks
+  const cx = x + TILE_SIZE / 2;
+  const cy = y + TILE_SIZE / 2;
+
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, TILE_SIZE * 0.36, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#0d2233';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, TILE_SIZE * 0.18, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Ice-blue fracture lines
+  ctx.strokeStyle = '#5ad8ff';
+  ctx.lineWidth = 1.5;
+  const cracks = [
+    [cx, cy, cx + TILE_SIZE * 0.32, cy - TILE_SIZE * 0.28],
+    [cx, cy, cx - TILE_SIZE * 0.26, cy + TILE_SIZE * 0.30],
+    [cx, cy, cx + TILE_SIZE * 0.20, cy + TILE_SIZE * 0.35],
+    [cx, cy, cx - TILE_SIZE * 0.30, cy - TILE_SIZE * 0.22],
+  ];
+  for (const [x1, y1, x2, y2] of cracks) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // Center glow
+  ctx.fillStyle = '#5ad8ff';
+  ctx.fillRect(Math.round(cx - 3), Math.round(cy - 3), 6, 6);
 }
 
 function clamp01(value: number): number {
@@ -117,6 +175,22 @@ function collectJobOverlays(state: GameState, activePlayerId: string): TileJobOv
       worldY: factoryJob.y,
       label: factoryJob.kind === 'REFRIGERATOR' ? 'Crafting Fridge' : 'Crafting Blue Ice',
       remainingMs: Math.max(0, factoryJob.completesAtMs - state.nowMs),
+      progress: clamp01(elapsedMs / totalMs),
+      mode: 'ACTIVE',
+    });
+  }
+
+  for (const warJob of state.warCraftJobs) {
+    if (warJob.status !== 'ACTIVE') {
+      continue;
+    }
+    const totalMs = Math.max(1, warJob.completesAtMs - warJob.startedAtMs);
+    const elapsedMs = Math.max(0, state.nowMs - warJob.startedAtMs);
+    overlays.push({
+      worldX: warJob.x,
+      worldY: warJob.y,
+      label: warJob.kind === 'NUKE' ? '☢ Crafting Nuke' : '⚔ Crafting Warriors',
+      remainingMs: Math.max(0, warJob.completesAtMs - state.nowMs),
       progress: clamp01(elapsedMs / totalMs),
       mode: 'ACTIVE',
     });
@@ -403,6 +477,14 @@ export class PixelRenderer {
           this.ctx.drawImage(frame, px, py, TILE_SIZE, TILE_SIZE);
         } else {
           drawFallbackTile(this.ctx, tile, px, py);
+        }
+
+        // Special overlays for war tiles
+        if (tile.type === 'WAR_FACTORY') {
+          drawWarFactoryBadge(this.ctx, px, py);
+        }
+        if (tile.type === 'CRATER') {
+          drawCraterOverlay(this.ctx, px, py);
         }
 
         drawOwnershipOutline(this.ctx, tile, state, px, py);

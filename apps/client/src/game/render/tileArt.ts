@@ -20,7 +20,7 @@ import houseTransitionUrl from '../../assets/tiles-transition256/house-transitio
 import factoryTransitionUrl from '../../assets/tiles-transition256/factory-transition-winter-to-summer-grid.png';
 import trainTransitionUrl from '../../assets/tiles-transition256/train-transition-winter-to-summer-grid.png';
 
-type ArtTileType = 'GRASS' | 'FOREST' | 'POND' | 'HOUSE' | 'FACTORY' | 'TRAIN';
+type ArtTileType = 'GRASS' | 'FOREST' | 'POND' | 'HOUSE' | 'FACTORY' | 'TRAIN' | 'WAR_FACTORY' | 'CRATER';
 
 interface TileArtBundle {
   summer: HTMLImageElement;
@@ -114,6 +114,10 @@ export class TileArtLibrary {
       HOUSE: buildBundle(houseSummerUrl, houseWinterUrl, houseTransitionUrl),
       FACTORY: buildBundle(factorySummerUrl, factoryWinterUrl, factoryTransitionUrl),
       TRAIN: buildBundle(trainSummerUrl, trainWinterUrl, trainTransitionUrl),
+      // War factory reuses factory art (overlay added in renderer)
+      WAR_FACTORY: buildBundle(factorySummerUrl, factoryWinterUrl, factoryTransitionUrl),
+      // Crater reuses grass art (tinted dark in renderer)
+      CRATER: buildBundle(grassSummerUrl, grassWinterUrl, grassTransitionUrl),
     };
   }
 
@@ -125,6 +129,8 @@ export class TileArtLibrary {
       case 'HOUSE':
       case 'FACTORY':
       case 'TRAIN':
+      case 'WAR_FACTORY':
+      case 'CRATER':
         return this.bundles[type];
       case 'VOID':
         return this.bundles.GRASS;
@@ -137,6 +143,8 @@ export class TileArtLibrary {
     if (type === 'VOID') {
       return null;
     }
+    // CRATER returns grass frame (tinted dark by the renderer)
+
     const bundle = this.bundleFor(type);
     const index = clampFrameIndex(frameIndex);
 

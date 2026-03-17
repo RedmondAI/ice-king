@@ -1,4 +1,4 @@
-import type { GameState } from '@ice-king/shared';
+import type { GameState, WarCraftJob } from '@ice-king/shared';
 
 export interface PopupAction {
   id: string;
@@ -49,6 +49,19 @@ export class HudLayer {
   private lastPopupSignature: string | null = null;
   private readonly opponentHudBody: HTMLDivElement;
   private readonly opponentHudToggle: HTMLButtonElement;
+
+  // War panel
+  private readonly warPanel: HTMLDivElement;
+  private readonly warButton: HTMLButtonElement;
+  private readonly warTimerEl: HTMLDivElement;
+  private readonly warResultEl: HTMLDivElement;
+  private readonly warriorBoxes: HTMLDivElement;
+  private readonly blueWarriorBox: HTMLDivElement;
+  private readonly redWarriorBox: HTMLDivElement;
+  private readonly blueFlag: HTMLDivElement;
+  private readonly redFlag: HTMLDivElement;
+  private onWarButtonClick: (() => void) | null = null;
+  private onWarCommitClick: ((count: number) => void) | null = null;
 
   constructor(
     mount: HTMLElement,
@@ -219,6 +232,115 @@ export class HudLayer {
     this.skipSummerStatus.className = 'skip-summer-status';
     this.skipSummerStatus.style.display = 'none';
 
+    // ── War Panel ──────────────────────────────────────────────────
+    this.warPanel = document.createElement('div');
+    this.warPanel.className = 'war-panel pixel-panel';
+
+    const warPanelHead = document.createElement('div');
+    warPanelHead.className = 'war-panel-head';
+
+    const warPanelTitle = document.createElement('span');
+    warPanelTitle.className = 'war-panel-title';
+    warPanelTitle.textContent = '⚔ WAR';
+
+    this.warButton = document.createElement('button');
+    this.warButton.className = 'pixel-button war-button';
+    this.warButton.textContent = 'WAR';
+    this.warButton.addEventListener('click', () => {
+      this.onWarButtonClick?.();
+    });
+
+    warPanelHead.append(warPanelTitle, this.warButton);
+
+    this.warTimerEl = document.createElement('div');
+    this.warTimerEl.className = 'war-timer';
+    this.warTimerEl.style.display = 'none';
+
+    this.warResultEl = document.createElement('div');
+    this.warResultEl.className = 'war-result';
+    this.warResultEl.style.display = 'none';
+
+    // Warrior boxes (blue on left, red on right)
+    this.warriorBoxes = document.createElement('div');
+    this.warriorBoxes.className = 'warrior-boxes';
+
+    this.blueWarriorBox = document.createElement('div');
+    this.blueWarriorBox.className = 'warrior-box warrior-box-blue';
+
+    const blueBoxLabel = document.createElement('div');
+    blueBoxLabel.className = 'warrior-box-label';
+    blueBoxLabel.textContent = 'BLUE';
+    blueBoxLabel.style.color = 'var(--blue)';
+
+    const blueBoxArena = document.createElement('div');
+    blueBoxArena.className = 'warrior-arena';
+
+    const blueCommitRow = document.createElement('div');
+    blueCommitRow.className = 'warrior-commit-row';
+
+    const blueAddBtn = document.createElement('button');
+    blueAddBtn.className = 'pixel-button warrior-add-btn';
+    blueAddBtn.textContent = '+';
+    blueAddBtn.setAttribute('data-color', 'BLUE');
+    blueAddBtn.addEventListener('click', () => {
+      this.onWarCommitClick?.(1);
+    });
+
+    const blueCountEl = document.createElement('span');
+    blueCountEl.className = 'warrior-committed-count';
+    blueCountEl.textContent = '0';
+    blueCountEl.setAttribute('data-warrior-color', 'BLUE');
+
+    blueCommitRow.append(blueAddBtn, blueCountEl);
+
+    this.blueFlag = document.createElement('div');
+    this.blueFlag.className = 'war-flag war-flag-blue';
+    this.blueFlag.style.display = 'none';
+    this.blueFlag.textContent = '🏴';
+
+    this.blueWarriorBox.append(blueBoxLabel, blueBoxArena, blueCommitRow, this.blueFlag);
+
+    this.redWarriorBox = document.createElement('div');
+    this.redWarriorBox.className = 'warrior-box warrior-box-red';
+
+    const redBoxLabel = document.createElement('div');
+    redBoxLabel.className = 'warrior-box-label';
+    redBoxLabel.textContent = 'RED';
+    redBoxLabel.style.color = 'var(--red)';
+
+    const redBoxArena = document.createElement('div');
+    redBoxArena.className = 'warrior-arena';
+
+    const redCommitRow = document.createElement('div');
+    redCommitRow.className = 'warrior-commit-row';
+
+    const redAddBtn = document.createElement('button');
+    redAddBtn.className = 'pixel-button warrior-add-btn';
+    redAddBtn.textContent = '+';
+    redAddBtn.setAttribute('data-color', 'RED');
+    redAddBtn.addEventListener('click', () => {
+      this.onWarCommitClick?.(1);
+    });
+
+    const redCountEl = document.createElement('span');
+    redCountEl.className = 'warrior-committed-count';
+    redCountEl.textContent = '0';
+    redCountEl.setAttribute('data-warrior-color', 'RED');
+
+    redCommitRow.append(redAddBtn, redCountEl);
+
+    this.redFlag = document.createElement('div');
+    this.redFlag.className = 'war-flag war-flag-red';
+    this.redFlag.style.display = 'none';
+    this.redFlag.textContent = '🏴';
+
+    this.redWarriorBox.append(redBoxLabel, redBoxArena, redCommitRow, this.redFlag);
+
+    this.warriorBoxes.append(this.blueWarriorBox, this.redWarriorBox);
+
+    this.warPanel.append(warPanelHead, this.warTimerEl, this.warResultEl, this.warriorBoxes);
+    // ────────────────────────────────────────────────────────────────
+
     this.instructions.append(instructionsHead, this.instructionsBody);
     this.hud.append(
       this.instructions,
@@ -228,6 +350,7 @@ export class HudLayer {
       this.opponentHudBody,
       this.skipSummerButton,
       this.skipSummerStatus,
+      this.warPanel,
     );
 
     this.debugToggleButton = document.createElement('button');
@@ -493,6 +616,158 @@ export class HudLayer {
       node.className = 'toast';
       node.textContent = toast.text;
       this.toastStack.append(node);
+    }
+  }
+
+  setWarCallbacks(
+    onWarButtonClick: () => void,
+    onWarCommitClick: (count: number) => void,
+  ): void {
+    this.onWarButtonClick = onWarButtonClick;
+    this.onWarCommitClick = onWarCommitClick;
+  }
+
+  updateWarPanel(
+    state: GameState,
+    localPlayerId: string,
+    nowMs: number,
+    pendingWarCraftJobs: WarCraftJob[],
+  ): void {
+    const session = state.warSession;
+    const localPlayer = state.players[localPlayerId];
+    if (!localPlayer) return;
+
+    const isWarActive = session && !session.resolved;
+    const isShowingResult = session?.resolved && session.showResultUntilMs !== null && nowMs < session.showResultUntilMs;
+
+    // WAR button: show when no active war
+    this.warButton.style.display = !isWarActive && !isShowingResult ? 'block' : 'none';
+
+    // Timer
+    if (isWarActive) {
+      const remaining = Math.max(0, session.endsAtMs - nowMs);
+      const min = Math.floor(remaining / 60000);
+      const sec = Math.floor((remaining % 60000) / 1000).toString().padStart(2, '0');
+      this.warTimerEl.textContent = `WAR ENDS IN ${min}:${sec}`;
+      this.warTimerEl.style.display = 'block';
+    } else {
+      this.warTimerEl.style.display = 'none';
+    }
+
+    // Result banner
+    if (isShowingResult && session) {
+      const winnerId = session.winnerId;
+      const isWinner = winnerId === localPlayerId;
+      const winner = winnerId ? state.players[winnerId] : null;
+      if (!winnerId) {
+        this.warResultEl.textContent = 'TIE! No winner.';
+        this.warResultEl.className = 'war-result war-result-tie';
+      } else if (isWinner) {
+        this.warResultEl.textContent = `YOU WIN! Stole half their gold!`;
+        this.warResultEl.className = 'war-result war-result-win';
+      } else {
+        this.warResultEl.textContent = `YOU LOSE! ${winner?.name ?? 'Enemy'} took half your gold!`;
+        this.warResultEl.className = 'war-result war-result-lose';
+      }
+      this.warResultEl.style.display = 'block';
+    } else {
+      this.warResultEl.style.display = 'none';
+    }
+
+    // Update each warrior box
+    for (const pid of state.playerOrder) {
+      const player = state.players[pid];
+      if (!player) continue;
+
+      const color = player.color;
+      const box = color === 'BLUE' ? this.blueWarriorBox : this.redWarriorBox;
+      const flag = color === 'BLUE' ? this.blueFlag : this.redFlag;
+      const arena = box.querySelector('.warrior-arena') as HTMLDivElement;
+      const countEl = box.querySelector('.warrior-committed-count') as HTMLSpanElement;
+      const addBtn = box.querySelector('.warrior-add-btn') as HTMLButtonElement;
+
+      // Committed count display
+      const committed = session?.committedByPlayerId[pid] ?? 0;
+      countEl.textContent = String(committed);
+
+      // Add button: only show if it's the local player's box, war is active, and they have warriors
+      const isLocalPlayer = pid === localPlayerId;
+      if (isLocalPlayer && isWarActive) {
+        addBtn.style.display = 'block';
+        addBtn.disabled = player.warriors < 1;
+      } else {
+        addBtn.style.display = 'none';
+      }
+
+      // Warriors walking animation in arena
+      const totalWarriors = isShowingResult && session?.winnerId
+        ? (session.winnerId === pid ? committed + (session.committedByPlayerId[session.winnerId] ?? 0) : 0)
+        : committed;
+
+      // Rebuild warrior figures if count changed
+      const existing = arena.querySelectorAll('.warrior-figure').length;
+      if (existing !== totalWarriors) {
+        arena.innerHTML = '';
+        for (let i = 0; i < Math.min(totalWarriors, 8); i++) {
+          const fig = document.createElement('div');
+          fig.className = `warrior-figure warrior-figure-${color.toLowerCase()}`;
+          fig.style.animationDelay = `${(i * 0.18).toFixed(2)}s`;
+          arena.append(fig);
+        }
+        if (totalWarriors > 8) {
+          const more = document.createElement('span');
+          more.className = 'warrior-overflow';
+          more.textContent = `+${totalWarriors - 8}`;
+          arena.append(more);
+        }
+      }
+
+      // Flag: show on loser after result
+      if (isShowingResult && session?.winnerId && session.winnerId !== pid) {
+        const winnerColor = state.players[session.winnerId]?.color ?? 'BLUE';
+        flag.textContent = winnerColor === 'BLUE' ? '🔵' : '🔴';
+        flag.style.display = 'block';
+        flag.className = `war-flag war-flag-${winnerColor.toLowerCase()}`;
+      } else if (!isShowingResult) {
+        flag.style.display = 'none';
+      }
+    }
+
+    // Add button for non-opponent player in non-war state — show inventory
+    const nukeInfo = document.getElementById('war-nuke-info');
+    if (nukeInfo) {
+      nukeInfo.textContent = `Nukes: ${localPlayer.nukes} | Warriors: ${localPlayer.warriors}`;
+    }
+
+    // Show inventory row at top of war panel (nukes/warriors)
+    let inventoryRow = this.warPanel.querySelector('.war-inventory') as HTMLDivElement | null;
+    if (!inventoryRow) {
+      inventoryRow = document.createElement('div');
+      inventoryRow.className = 'war-inventory';
+      this.warPanel.insertBefore(inventoryRow, this.warPanel.children[1] ?? null);
+    }
+    inventoryRow.textContent = `💣 ${localPlayer.nukes} nukes  ⚔ ${localPlayer.warriors} warriors`;
+
+    // Show war craft jobs status
+    let jobsRow = this.warPanel.querySelector('.war-jobs') as HTMLDivElement | null;
+    if (!jobsRow) {
+      jobsRow = document.createElement('div');
+      jobsRow.className = 'war-jobs';
+      this.warPanel.insertBefore(jobsRow, this.warTimerEl);
+    }
+
+    if (pendingWarCraftJobs.length > 0) {
+      const jobText = pendingWarCraftJobs.map((j) => {
+        const remaining = Math.max(0, j.completesAtMs - nowMs);
+        const min = Math.floor(remaining / 60000);
+        const sec = Math.floor((remaining % 60000) / 1000).toString().padStart(2, '0');
+        const label = j.status === 'COMPLETE' ? `✓ ${j.kind} READY` : `${j.kind} crafting ${min}:${sec}`;
+        return label;
+      }).join('\n');
+      jobsRow.textContent = jobText;
+      jobsRow.style.display = 'block';
+    } else {
+      jobsRow.style.display = 'none';
     }
   }
 

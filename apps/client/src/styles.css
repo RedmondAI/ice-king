@@ -802,6 +802,309 @@ input {
   pointer-events: none;
 }
 
+/* ── War Panel ──────────────────────────────────────────────────────── */
+
+.war-panel {
+  width: 100%;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.war-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.war-panel-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #cc1111;
+  text-shadow: 1px 1px 0 #3e0000;
+}
+
+.war-button {
+  background: linear-gradient(180deg, #ff4444 0%, #cc1111 100%);
+  border-color: #7a0000;
+  color: #fff;
+  font-size: 10px;
+  padding: 6px 10px;
+  min-height: 32px;
+  letter-spacing: 1px;
+  animation: war-pulse 1.8s ease-in-out infinite;
+}
+
+.war-button:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, #ff6666 0%, #ee2222 100%);
+}
+
+@keyframes war-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(204,17,17,0.6); }
+  50% { box-shadow: 0 0 8px 3px rgba(204,17,17,0.4); }
+}
+
+.war-timer {
+  font-size: 10px;
+  color: #cc1111;
+  text-align: center;
+  padding: 4px;
+  border: 2px solid #cc1111;
+  background: rgba(80,0,0,0.1);
+  animation: blink-timer 1s step-end infinite;
+}
+
+@keyframes blink-timer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.war-result {
+  font-size: 10px;
+  text-align: center;
+  padding: 6px;
+  border: 3px solid;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.war-result-win {
+  color: #155a15;
+  border-color: #4aaa4a;
+  background: rgba(50, 180, 50, 0.15);
+  animation: flash-win 0.5s ease-in-out 3;
+}
+
+.war-result-lose {
+  color: #8a0000;
+  border-color: #cc3333;
+  background: rgba(180, 30, 30, 0.15);
+  animation: shake-lose 0.4s ease-in-out 2;
+}
+
+.war-result-tie {
+  color: #7a6000;
+  border-color: #c8a820;
+  background: rgba(200, 168, 32, 0.12);
+}
+
+@keyframes flash-win {
+  0%, 100% { background: rgba(50, 180, 50, 0.15); }
+  50% { background: rgba(50, 180, 50, 0.35); }
+}
+
+@keyframes shake-lose {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.war-inventory {
+  font-size: 9px;
+  color: #4e3a1f;
+  padding: 3px 4px;
+  background: rgba(0,0,0,0.06);
+  border: 1px dashed rgba(107, 79, 42, 0.4);
+}
+
+.war-jobs {
+  font-size: 8px;
+  color: #4e3a1f;
+  white-space: pre;
+  line-height: 1.4;
+  padding: 3px 4px;
+  background: rgba(0,0,0,0.05);
+  border-left: 3px solid #cc1111;
+}
+
+/* Warrior boxes */
+.warrior-boxes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.warrior-box {
+  border: 2px solid;
+  padding: 5px 4px;
+  display: grid;
+  gap: 4px;
+  background: rgba(255,255,255,0.06);
+  position: relative;
+  min-height: 80px;
+}
+
+.warrior-box-blue {
+  border-color: var(--blue);
+}
+
+.warrior-box-red {
+  border-color: var(--red);
+}
+
+.warrior-box-label {
+  font-size: 8px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.warrior-arena {
+  flex: 1;
+  min-height: 36px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.warrior-figure {
+  width: 8px;
+  height: 14px;
+  position: relative;
+  display: inline-block;
+  animation: warrior-walk 0.6s steps(2) infinite;
+}
+
+.warrior-figure-blue {
+  background: var(--blue);
+  box-shadow: 0 0 0 1px #1a5aaa;
+}
+
+.warrior-figure-red {
+  background: var(--red);
+  box-shadow: 0 0 0 1px #8a1111;
+}
+
+.warrior-figure::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.warrior-figure-blue::before { background: #99d4ff; }
+.warrior-figure-red::before { background: #ffaaaa; }
+
+@keyframes warrior-walk {
+  0% { transform: translateX(0) scaleX(1); }
+  25% { transform: translateX(2px) scaleX(1); }
+  50% { transform: translateX(0) scaleX(-1); }
+  75% { transform: translateX(-2px) scaleX(-1); }
+  100% { transform: translateX(0) scaleX(1); }
+}
+
+.warrior-overflow {
+  font-size: 7px;
+  color: #4e3a1f;
+  align-self: center;
+}
+
+.warrior-commit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.warrior-add-btn {
+  min-height: 20px;
+  padding: 2px 6px;
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+
+.warrior-committed-count {
+  font-size: 9px;
+  color: #4e3a1f;
+}
+
+.war-flag {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 16px;
+  line-height: 1;
+  animation: flag-wave 1.2s ease-in-out infinite;
+}
+
+@keyframes flag-wave {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+/* ── Nuke Explosion Animation ───────────────────────────────────────── */
+
+.nuke-explosion {
+  position: absolute;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 200;
+  animation: nuke-fade 2.2s ease-out forwards;
+}
+
+@keyframes nuke-fade {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.nuke-core {
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, #a8f4ff 30%, #00d4ff 60%, #0055ff 90%, transparent 100%);
+  animation: nuke-core-burst 2.2s ease-out forwards;
+}
+
+@keyframes nuke-core-burst {
+  0% { transform: scale(0.1); opacity: 1; }
+  15% { transform: scale(1.6); opacity: 1; }
+  40% { transform: scale(1.0); opacity: 0.9; }
+  100% { transform: scale(0.4); opacity: 0; }
+}
+
+.nuke-ring {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  border: 6px solid rgba(0, 212, 255, 0.8);
+  animation: nuke-ring-expand 1s ease-out forwards;
+}
+
+@keyframes nuke-ring-expand {
+  0% { transform: scale(0.2); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.nuke-shard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 14px;
+  margin: -7px -3px;
+  background: linear-gradient(180deg, #ffffff, #5af0ff);
+  border: 1px solid #00aaee;
+  transform-origin: center bottom;
+  transform: rotate(var(--angle));
+  animation: nuke-shard-fly 0.9s ease-out forwards;
+}
+
+@keyframes nuke-shard-fly {
+  0% { transform: rotate(var(--angle)) translateY(0) scale(1); opacity: 1; }
+  100% { transform: rotate(var(--angle)) translateY(-60px) scale(0.2); opacity: 0; }
+}
+
 /* ── Tablet (≤1080px): side rail overlays on canvas ── */
 @media (max-width: 1080px) {
   .game-shell {

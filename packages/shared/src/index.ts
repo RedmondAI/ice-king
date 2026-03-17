@@ -9,7 +9,7 @@ export type PlayerController = z.infer<typeof PlayerControllerSchema>;
 export const SeasonSchema = z.enum(['SUMMER', 'WINTER']);
 export type Season = z.infer<typeof SeasonSchema>;
 
-export const TileTypeSchema = z.enum(['GRASS', 'POND', 'HOUSE', 'FACTORY', 'TRAIN', 'FOREST', 'VOID']);
+export const TileTypeSchema = z.enum(['GRASS', 'POND', 'HOUSE', 'FACTORY', 'TRAIN', 'FOREST', 'VOID', 'WAR_FACTORY', 'CRATER']);
 export type TileType = z.infer<typeof TileTypeSchema>;
 
 export const TileSourceSchema = z.enum(['MAP_GENERATED', 'PLAYER_BUILT']);
@@ -17,6 +17,12 @@ export type TileSource = z.infer<typeof TileSourceSchema>;
 
 export const CraftKindSchema = z.enum(['REFRIGERATOR', 'BLUE_ICE']);
 export type CraftKind = z.infer<typeof CraftKindSchema>;
+
+export const WarCraftKindSchema = z.enum(['NUKE', 'WARRIORS']);
+export type WarCraftKind = z.infer<typeof WarCraftKindSchema>;
+
+export const WarCraftJobStatusSchema = z.enum(['ACTIVE', 'COMPLETE', 'COLLECTED']);
+export type WarCraftJobStatus = z.infer<typeof WarCraftJobStatusSchema>;
 
 export const PondJobStatusSchema = z.enum(['ACTIVE', 'CLAIMABLE', 'CLAIMED']);
 export type PondJobStatus = z.infer<typeof PondJobStatusSchema>;
@@ -49,6 +55,8 @@ export interface PlayerState {
   refrigerators: number;
   connected: boolean;
   ready: boolean;
+  nukes: number;
+  warriors: number;
 }
 
 export interface BotPendingAction {
@@ -86,6 +94,27 @@ export interface PondHarvestJob {
   createdAtMs: number;
   claimAtMs: number;
   claimedAtMs: number | null;
+}
+
+export interface WarCraftJob {
+  id: string;
+  ownerId: string;
+  x: number;
+  y: number;
+  kind: WarCraftKind;
+  status: WarCraftJobStatus;
+  startedAtMs: number;
+  completesAtMs: number;
+  collectedAtMs: number | null;
+}
+
+export interface WarSession {
+  startedAtMs: number;
+  endsAtMs: number;
+  committedByPlayerId: Record<string, number>;
+  resolved: boolean;
+  winnerId: string | null;
+  showResultUntilMs: number | null;
 }
 
 export interface TrainSaleState {
@@ -147,6 +176,8 @@ export interface GameState {
   season: SeasonState;
   ponds: PondHarvestJob[];
   factoryJobs: FactoryCraftJob[];
+  warCraftJobs: WarCraftJob[];
+  warSession: WarSession | null;
   trainSales: TrainSaleState;
   cameraByPlayer: Record<string, CameraState>;
   reconnect: ReconnectState;
@@ -214,6 +245,12 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   gameActionBase.extend({ type: z.literal('camera.move'), x: z.number(), y: z.number() }),
   gameActionBase.extend({ type: z.literal('tile.select'), ...coordinateSchema.shape }),
   gameActionBase.extend({ type: z.literal('player.forfeit') }),
+  gameActionBase.extend({ type: z.literal('tile.buildWarFactory'), ...coordinateSchema.shape }),
+  gameActionBase.extend({ type: z.literal('war.craft.start'), ...coordinateSchema.shape, kind: WarCraftKindSchema }),
+  gameActionBase.extend({ type: z.literal('war.craft.collect'), jobId: z.string().min(1) }),
+  gameActionBase.extend({ type: z.literal('war.nuke'), ...coordinateSchema.shape }),
+  gameActionBase.extend({ type: z.literal('war.battle.start') }),
+  gameActionBase.extend({ type: z.literal('war.battle.commit'), count: z.number().int().positive() }),
 ]);
 
 export type GameAction = z.infer<typeof GameActionSchema>;

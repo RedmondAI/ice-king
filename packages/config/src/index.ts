@@ -16,6 +16,12 @@ export interface EconomyConfig {
   trainShipmentIceCost: number;
   trainShipmentMoneyGain: number;
   refrigeratorStoragePerUnit: number;
+  buildWarFactoryMoneyCost: number;
+  buildWarFactoryBlueIceCost: number;
+  warNukeMoneyCost: number;
+  warNukeBlueIceCost: number;
+  warWarriorsMoneyCost: number;
+  warWarriorsBlueIceCost: number;
 }
 
 export interface TimingConfig {
@@ -23,6 +29,10 @@ export interface TimingConfig {
   transitionDurationMs: number;
   pondHarvestDurationMs: number;
   factoryCraftDurationMs: number;
+  warNukeDurationMs: number;
+  warWarriorsDurationMs: number;
+  warBattleDurationMs: number;
+  warResultDisplayMs: number;
   matchDurationMs: number;
   reconnectPauseMs: number;
   botDecisionCadenceMs: number;
@@ -83,12 +93,22 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
     trainShipmentIceCost: 3,
     trainShipmentMoneyGain: 9,
     refrigeratorStoragePerUnit: 2,
+    buildWarFactoryMoneyCost: 2,
+    buildWarFactoryBlueIceCost: 1,
+    warNukeMoneyCost: 2,
+    warNukeBlueIceCost: 2,
+    warWarriorsMoneyCost: 1,
+    warWarriorsBlueIceCost: 1,
   },
   timing: {
     seasonDurationMs: 5 * 60 * 1000,
     transitionDurationMs: 60 * 1000,
     pondHarvestDurationMs: 60 * 1000,
     factoryCraftDurationMs: 2 * 60 * 1000,
+    warNukeDurationMs: 4 * 60 * 1000,
+    warWarriorsDurationMs: 60 * 1000,
+    warBattleDurationMs: 5 * 60 * 1000,
+    warResultDisplayMs: 5 * 1000,
     matchDurationMs: 30 * 60 * 1000,
     reconnectPauseMs: 90 * 1000,
     botDecisionCadenceMs: 2500,
@@ -145,6 +165,9 @@ export function createGameConfig(
     merged.timing.seasonDurationMs = 75 * 1000;
     merged.timing.transitionDurationMs = 15 * 1000;
     merged.timing.factoryCraftDurationMs = 20 * 1000;
+    merged.timing.warNukeDurationMs = 30 * 1000;
+    merged.timing.warWarriorsDurationMs = 15 * 1000;
+    merged.timing.warBattleDurationMs = 60 * 1000;
     merged.timing.matchDurationMs = 8 * 60 * 1000;
     merged.timing.botDecisionCadenceMs = 1200;
     merged.timing.botReactionDelayMs = 250;

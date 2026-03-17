@@ -35,6 +35,8 @@ function createPlayerState(input: InitialPlayerInput, config: GameConfig): Playe
     refrigerators: config.startingRefrigerators,
     connected: true,
     ready: true,
+    nukes: 0,
+    warriors: 0,
   };
 }
 
@@ -113,6 +115,8 @@ export function createInitialState(options: CreateInitialStateOptions): GameStat
     },
     ponds: [],
     factoryJobs: [],
+    warCraftJobs: [],
+    warSession: null,
     trainSales: {
       currentYear: 1,
       usedByPlayerId,
