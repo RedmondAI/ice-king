@@ -425,6 +425,8 @@ export class GameRuntime {
       this.handlePopupAction,
       this.sideRail,
       this.handleSkipSummerVote,
+      this.gameMode,
+      options.opponentType,
     );
     this.hud.setOpponentStatsVisible(options.opponentType !== 'NONE');
     this.hud.setWarCallbacks(

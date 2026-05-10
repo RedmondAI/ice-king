@@ -1,4 +1,197 @@
 import type { GameState, WarCraftJob } from '@ice-king/shared';
+import type { GameMode, RuntimeOpponentType } from '../types';
+
+/**
+ * Build the in-game instructions text for the collapsable Instructions panel,
+ * tailored to the current game mode. Sections:
+ *   - Intro line that names the mode + opponent makeup
+ *   - Goal (mode-specific)
+ *   - How To Rule — the universal economy loop
+ *   - Warfare — WAR Factory / nukes / warriors (skipped or noted for SOLO)
+ *   - Royal Tips — controls + mode-specific tactical hints
+ *   - Closing flavour line
+ */
+export function buildInstructionsText(
+  gameMode: GameMode,
+  opponentType: RuntimeOpponentType,
+): string {
+  const baseEconomyLoop = [
+    'How To Rule:',
+    '  1) Buy land. Click a tile to select it, then click again to open Tile Actions.',
+    '  2) Winter freezes ponds. Own a pond to start a harvest job and collect ice when it ripens.',
+    '  3) Build factories on owned grass or forest to craft refrigerators and rare blue ice.',
+    '  4) Refrigerators protect ice from the summer melt — keep your refrigerated count high.',
+    '  5) Sell ice at your houses for coins, or ship a big load at the train once per year.',
+  ];
+
+  const baseControls = [
+    '  - Drag the map to pan. Click the minimap to jump the camera.',
+    '  - Borders are dead land: you cannot buy or build there.',
+    '  - Press F3 for the debug overlay, F for fullscreen.',
+  ];
+
+  const warfareSection = (extra?: string) => {
+    const lines = [
+      'Warfare:',
+      '  - Build a War Factory on owned land (costs 1 blue ice + $2c) to craft warriors and nukes.',
+      '  - Warriors take 1 minute to craft (2 per batch); nukes take 4 minutes.',
+      '  - Click WAR in the side rail to declare war. While war is active, commit warriors to the',
+      '    BLUE arena — they auto-fight the enemy RED arena when the war timer expires.',
+      '  - Win a battle to steal half the enemy treasury. Nukes destroy enemy tiles outright.',
+    ];
+    if (extra) lines.push(extra);
+    return lines;
+  };
+
+  const closing = 'May your treasury grow cold and your rival grow broke.';
+
+  switch (gameMode) {
+    case 'PLAY_VS_COMPUTER':
+      return [
+        'Welcome, Your Majesty.',
+        '',
+        'A local duel against the Ice Bot.',
+        '',
+        'Goal:',
+        '  End the 30-minute match with more money than the Ice Bot.',
+        '  If you are tied at time, an overtime period decides it.',
+        '',
+        ...baseEconomyLoop,
+        '',
+        ...warfareSection(),
+        '',
+        'Royal Tips:',
+        ...baseControls,
+        '  - The Ice Bot adapts to the season — do not sleep on summer prep.',
+        '  - Use the WAR button early once you have blue ice: stolen gold compounds fast.',
+        '',
+        closing,
+      ].join('\n');
+
+    case 'PLAY_ONLINE':
+      return [
+        'Welcome, Your Majesty.',
+        '',
+        'An online duel against another human ruler.',
+        '',
+        'Goal:',
+        '  End the 30-minute match with more money than your rival.',
+        '  Overtime breaks ties; if still tied, the match is a draw.',
+        '',
+        ...baseEconomyLoop,
+        '',
+        ...warfareSection(),
+        '',
+        'Royal Tips:',
+        ...baseControls,
+        '  - Use the chat panel to taunt, trade, or sue for peace.',
+        '  - Latency aside, both rulers play on the same simulated tick — your clicks are authoritative.',
+        '',
+        closing,
+      ].join('\n');
+
+    case 'SOLO':
+      return [
+        'Welcome, Your Majesty.',
+        '',
+        'A solo run. No opponent — just you and the seasons.',
+        '',
+        'Goal:',
+        '  Run your economy for 30 minutes and grow your treasury as large as possible.',
+        '  Solo runs are for high-score chasing; final money is not converted to Ice Coins.',
+        '',
+        ...baseEconomyLoop,
+        '',
+        'Warfare:',
+        '  - War Factory can be built and warriors crafted, but there is no enemy to fight.',
+        '  - Use Solo to learn the economy and refrigerator timing without pressure.',
+        '',
+        'Royal Tips:',
+        ...baseControls,
+        '  - No rival means no land race. Optimise for refrigerator coverage and train shipments.',
+        '  - Plant factories early on safe inland tiles; ponds first when winter starts.',
+        '',
+        closing,
+      ].join('\n');
+
+    case 'FRIENDLY':
+      return [
+        'Welcome, Your Majesty.',
+        '',
+        'A friendly co-op match. You and a teammate share land ownership,',
+        'but keep separate money and ice reserves.',
+        '',
+        'Goal:',
+        '  End the 30-minute match with the highest combined team money.',
+        '  Your team total is the sum of both rulers\' coffers.',
+        '',
+        ...baseEconomyLoop,
+        '',
+        ...warfareSection(
+          '  - Shared land means either teammate can build a War Factory — coordinate so you don\'t double-spend.',
+        ),
+        '',
+        'Royal Tips:',
+        ...baseControls,
+        '  - Shared land = no land-grab race. Split duties: one rules ice, the other runs factories.',
+        '  - Each ruler still pays their own taxes — keep both treasuries healthy.',
+        '',
+        closing,
+      ].join('\n');
+
+    case 'TEAM':
+      return [
+        'Welcome, Your Majesty.',
+        '',
+        'A 4-player 2v2 team match: BLUE versus RED, with a scaled-up map and pond count.',
+        '',
+        'Goal:',
+        '  End the 30-minute match with the highest combined team money.',
+        '  Both BLUE rulers pool their coffers — same for RED.',
+        '',
+        ...baseEconomyLoop,
+        '',
+        ...warfareSection(
+          '  - WAR battles count team-wide: warriors from both team members fight together.',
+        ),
+        '',
+        'Royal Tips:',
+        ...baseControls,
+        '  - Split economy roles with your teammate: one focuses ponds, one factories.',
+        '  - Coordinate WAR timing in chat — pooled warriors swing the battle.',
+        '  - Watch both enemies\' refrigerator counts. A late summer nuke on a fridge tile is devastating.',
+        '',
+        closing,
+      ].join('\n');
+
+    case 'ICE_WARS':
+      return [
+        'Welcome, Your Majesty.',
+        '',
+        'Ice Wars is a locked, in-development team mode.',
+        'If you are seeing this in-game, it has been enabled for testing.',
+        '',
+        'Goal:',
+        '  TBD — expect team-based warfare with the full WAR mechanic featured front-and-centre.',
+        '',
+        ...baseEconomyLoop,
+        '',
+        ...warfareSection(),
+        '',
+        'Royal Tips:',
+        ...baseControls,
+        '',
+        closing,
+      ].join('\n');
+
+    default: {
+      // Exhaustiveness check — if GameMode gains a new variant, this surfaces it.
+      const _exhaustive: never = gameMode;
+      void _exhaustive;
+      return 'Welcome, Your Majesty.';
+    }
+  }
+}
 
 export interface PopupAction {
   id: string;
@@ -68,6 +261,8 @@ export class HudLayer {
     onPopupActionClick: (actionId: string) => void,
     sideRailMount?: HTMLElement,
     onSkipSummerClick?: () => void,
+    gameMode: GameMode = 'PLAY_VS_COMPUTER',
+    opponentType: RuntimeOpponentType = 'BOT',
   ) {
     this.overlay = document.createElement('div');
     this.overlay.className = 'overlay-layer';
@@ -100,26 +295,7 @@ export class HudLayer {
     this.instructionsBody = document.createElement('div');
     this.instructionsBody.className = 'instructions-body pixel-panel';
     this.instructionsBody.style.display = 'none';
-    this.instructionsBody.textContent = [
-      'Welcome, Your Majesty.',
-      '',
-      'Goal:',
-      '  End the match with the highest money total.',
-      '',
-      'How To Rule:',
-      '  1) Buy land. Click a tile to select it, then click again to open Tile Actions.',
-      '  2) Winter freezes ponds. Own a pond to start a harvest job and collect ice when ready.',
-      '  3) Build factories on owned grass/forest to craft refrigerators and blue ice.',
-      '  4) Refrigerators protect ice from the summer melt.',
-      '  5) Sell ice at your houses for coins, or ship big loads at the train once per year.',
-      '',
-      'Royal Tips:',
-      '  - Drag the map to pan. Use the minimap to jump the camera.',
-      '  - Borders are dead land: you cannot buy or build there.',
-      '  - Press F3 for debug, F for fullscreen.',
-      '',
-      'May your treasury grow cold and your rival grow broke.',
-    ].join('\n');
+    this.instructionsBody.textContent = buildInstructionsText(gameMode, opponentType);
 
     const hudHead = document.createElement('div');
     hudHead.className = 'hud-head pixel-panel';
