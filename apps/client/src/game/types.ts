@@ -54,6 +54,6 @@ export interface CameraChangeHandler {
 
 export interface IMinimapController {
   canvas: HTMLCanvasElement;
-  draw(state: GameState, activePlayerId: string): void;
+  draw(state: GameState, activePlayerId: string, viewAspect?: number): void;
   destroy(): void;
 }

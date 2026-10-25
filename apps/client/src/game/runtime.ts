@@ -14,7 +14,14 @@ import {
 import { PixelRenderer } from './render/pixelRenderer';
 import type { RuntimeInit, RuntimeOutcome } from './types';
 import { HudLayer } from './ui/hud';
-import { getViewportInfo, screenToTile, tileAt, tileToScreen, TILE_SIZE } from './view';
+import {
+  clampViewOrigin,
+  getViewportInfo,
+  screenToTile,
+  tileAt,
+  tileToScreen,
+  TILE_SIZE,
+} from './view';
 import {
   fetchMultiplayerRoomState,
   getMultiplayerErrorCode,
@@ -127,6 +134,8 @@ export class GameRuntime {
   private readonly minimapCanvas: HTMLCanvasElement;
   private readonly renderer: PixelRenderer;
   private readonly minimap: MinimapController;
+  private readonly stageResizeObserver: ResizeObserver | null;
+  private viewAspect = 1;
   private readonly hud: HudLayer;
   private readonly engine: GameEngine;
   private readonly multiplayerSession: MultiplayerSession | null;
@@ -464,6 +473,15 @@ export class GameRuntime {
     }
 
     this.mount.append(this.gameLayer);
+    this.syncViewportSize();
+    this.stageResizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            this.syncViewportSize();
+            this.render();
+          });
+    this.stageResizeObserver?.observe(this.gameLayer);
 
     this.bindInput();
     this.syncRenderHooks();
@@ -495,6 +513,7 @@ export class GameRuntime {
       this.multiplayerPollId = null;
     }
 
+    this.stageResizeObserver?.disconnect();
     this.minimap.destroy();
     this.hud.destroy();
 
@@ -584,13 +603,14 @@ export class GameRuntime {
     if (!camera) {
       return;
     }
+    const viewport = getViewportInfo(state, this.playerId, this.viewAspect);
 
     this.cameraDrag = {
       pointerId: event.pointerId,
       startClientX: event.clientX,
       startClientY: event.clientY,
-      startCameraX: camera.x,
-      startCameraY: camera.y,
+      startCameraX: viewport.cameraX,
+      startCameraY: viewport.cameraY,
       moved: false,
     };
 
@@ -621,19 +641,19 @@ export class GameRuntime {
         this.cameraDrag.moved = true;
       }
 
-      const tilesPerPixelX = camera.viewportTiles / rect.width;
-      const tilesPerPixelY = camera.viewportTiles / rect.height;
+      const viewport = getViewportInfo(state, this.playerId, this.viewAspect);
+      const tilesPerPixelX = viewport.viewportTilesX / rect.width;
+      const tilesPerPixelY = viewport.viewportTilesY / rect.height;
 
-      const nextX = clamp(
+      const next = clampViewOrigin(
+        state,
         this.cameraDrag.startCameraX - dx * tilesPerPixelX,
-        0,
-        state.width - camera.viewportTiles,
-      );
-      const nextY = clamp(
         this.cameraDrag.startCameraY - dy * tilesPerPixelY,
-        0,
-        state.height - camera.viewportTiles,
+        viewport.viewportTilesX,
+        viewport.viewportTilesY,
       );
+      const nextX = Math.max(0, next.x);
+      const nextY = Math.max(0, next.y);
 
       if (Math.abs(nextX - camera.x) > 0.01 || Math.abs(nextY - camera.y) > 0.01) {
         this.dispatchAction({
@@ -655,7 +675,7 @@ export class GameRuntime {
       return;
     }
 
-    const tile = screenToTile(state, this.playerId, canvasPoint.x, canvasPoint.y);
+    const tile = screenToTile(state, this.playerId, canvasPoint.x, canvasPoint.y, this.viewAspect);
     if (!tile) {
       this.hoveredTile = null;
       return;
@@ -706,7 +726,7 @@ export class GameRuntime {
       return;
     }
 
-    const tileCoord = screenToTile(state, this.playerId, canvasPoint.x, canvasPoint.y);
+    const tileCoord = screenToTile(state, this.playerId, canvasPoint.x, canvasPoint.y, this.viewAspect);
     if (!tileCoord) {
       return;
     }
@@ -745,7 +765,7 @@ export class GameRuntime {
     const state = this.engine.getState();
     const canvasWidth = this.canvas.width;
     const canvasHeight = this.canvas.height;
-    const viewport = getViewportInfo(state, this.playerId);
+    const viewport = getViewportInfo(state, this.playerId, this.viewAspect);
     const cameraTileX = Math.floor(viewport.cameraX);
     const cameraTileY = Math.floor(viewport.cameraY);
     const cameraOffsetX = Math.round((viewport.cameraX - cameraTileX) * TILE_SIZE);
@@ -1203,9 +1223,10 @@ export class GameRuntime {
 
     const speedTilesPerSec = 9;
     const delta = (speedTilesPerSec * stepMs) / 1000;
+    const viewport = getViewportInfo(state, this.playerId, this.viewAspect);
 
-    let nextX = camera.x;
-    let nextY = camera.y;
+    let nextX = viewport.cameraX;
+    let nextY = viewport.cameraY;
 
     if (this.pressedKeys.has('arrowleft') || this.pressedKeys.has('a')) {
       nextX -= delta;
@@ -1220,8 +1241,9 @@ export class GameRuntime {
       nextY += delta;
     }
 
-    const clampedX = clamp(nextX, 0, state.width - camera.viewportTiles);
-    const clampedY = clamp(nextY, 0, state.height - camera.viewportTiles);
+    const next = clampViewOrigin(state, nextX, nextY, viewport.viewportTilesX, viewport.viewportTilesY);
+    const clampedX = Math.max(0, next.x);
+    const clampedY = Math.max(0, next.y);
 
     if (Math.abs(clampedX - camera.x) > 0.01 || Math.abs(clampedY - camera.y) > 0.01) {
       this.dispatchAction({
@@ -1288,7 +1310,7 @@ export class GameRuntime {
       return;
     }
 
-    const tileCenter = tileToScreen(state, this.playerId, tile.x, tile.y);
+    const tileCenter = tileToScreen(state, this.playerId, tile.x, tile.y, this.viewAspect);
     const popupPoint = this.canvasToOverlayPoint(tileCenter.x + TILE_SIZE / 2, tileCenter.y + 8);
 
     const actions: Array<{ id: string; label: string; disabled?: boolean }> = [];
@@ -1451,7 +1473,7 @@ export class GameRuntime {
   }
 
   private tileCenterToOverlayPoint(tileX: number, tileY: number): { x: number; y: number } {
-    const tilePoint = tileToScreen(this.engine.getState(), this.playerId, tileX, tileY);
+    const tilePoint = tileToScreen(this.engine.getState(), this.playerId, tileX, tileY, this.viewAspect);
     return this.canvasToOverlayPoint(tilePoint.x + TILE_SIZE / 2, tilePoint.y + TILE_SIZE / 2);
   }
 
@@ -1602,9 +1624,23 @@ export class GameRuntime {
       activePlayerId: this.playerId,
       hoveredTile: this.hoveredTile,
       nowMs: state.nowMs,
+      viewAspect: this.viewAspect,
     });
 
-    this.minimap.draw(state, this.playerId);
+    this.minimap.draw(state, this.playerId, this.viewAspect);
+  }
+
+  private syncViewportSize(): void {
+    const stageWidth = this.gameLayer.clientWidth;
+    const stageHeight = this.gameLayer.clientHeight;
+    if (stageWidth > 0 && stageHeight > 0) {
+      this.viewAspect = stageWidth / stageHeight;
+    }
+
+    const viewport = getViewportInfo(this.engine.getState(), this.playerId, this.viewAspect);
+    if (this.canvas.width !== viewport.canvasWidth || this.canvas.height !== viewport.canvasHeight) {
+      this.renderer.resize(viewport.canvasWidth, viewport.canvasHeight);
+    }
   }
 
   private tickFixed(stepMs: number): void {
@@ -1668,11 +1704,13 @@ export class GameRuntime {
           owner: string | null;
         }>;
 
-        const viewport = getViewportInfo(state, this.playerId);
+        const viewport = getViewportInfo(state, this.playerId, this.viewAspect);
         const originX = Math.floor(viewport.cameraX);
         const originY = Math.floor(viewport.cameraY);
-        for (let y = 0; y < viewport.viewportTiles; y += 1) {
-          for (let x = 0; x < viewport.viewportTiles; x += 1) {
+        const spanX = Math.ceil(viewport.cameraX + viewport.viewportTilesX) - originX;
+        const spanY = Math.ceil(viewport.cameraY + viewport.viewportTilesY) - originY;
+        for (let y = 0; y < spanY; y += 1) {
+          for (let x = 0; x < spanX; x += 1) {
             const worldX = originX + x;
             const worldY = originY + y;
             const tile = tileAt(state, worldX, worldY);
@@ -1721,6 +1759,8 @@ export class GameRuntime {
             x: camera.x,
             y: camera.y,
             viewportTiles: camera.viewportTiles,
+            visibleTilesX: Number(viewport.viewportTilesX.toFixed(2)),
+            visibleTilesY: Number(viewport.viewportTilesY.toFixed(2)),
           },
           selectedTile: this.selectedTile,
           hoveredTile: this.hoveredTile,

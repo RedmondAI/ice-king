@@ -72,10 +72,10 @@ Last updated: 2026-02-27
 - Match end, overtime, forfeit/time winner logic (time winner is highest money, not net worth).
 
 ## Rendering and Layering
-- Main map: single `canvas` (`#game-canvas`) filling a centered square stage that scales uniformly to fit the browser window (max `1280 x 1280`).
-- Tile rendering uses `256x256` tile assets with `5x5` viewport draw.
+- Main map: single `canvas` (`#game-canvas`) filling a full-window stage. The runtime measures the stage aspect ratio (`ResizeObserver`) and `view.ts` (`visibleTileSpan`, `getViewportInfo`, `clampViewOrigin`) widens the visible tile span to match, clamped to the playable (non-`VOID`) bounds.
+- Tile rendering uses `256x256` tile assets; `camera.viewportTiles` (`5`) sets the short-axis tile count.
 - Background grass texture is world-anchored and scrolls with camera pan.
-- Minimap is separate canvas in the right-side control rail (outside the main game area).
+- Minimap is separate canvas in the right-side control rail (overlaid on the main game area).
 - Minimap keeps terrain color by tile type and overlays owner identity with larger standalone red/blue checkmarks.
 - DOM overlay layer sits above canvas and includes a dedicated right-side control rail that contains:
   - Instructions panel (above Stats; collapsed by default).

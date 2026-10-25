@@ -17,6 +17,8 @@ export interface RenderSceneInput {
   activePlayerId: string;
   hoveredTile: { x: number; y: number } | null;
   nowMs: number;
+  /** Stage width / height; widens the visible tile span to fill the stage. */
+  viewAspect: number;
 }
 
 const TILE_OUTLINE_WIDTH = 6;
@@ -390,7 +392,7 @@ function transitionFrameIndex(state: GameState): number {
 
 function drawSeasonAtmosphere(ctx: CanvasRenderingContext2D, input: RenderSceneInput): void {
   const { state, nowMs } = input;
-  const viewport = getViewportInfo(state, input.activePlayerId);
+  const viewport = getViewportInfo(state, input.activePlayerId, input.viewAspect);
   const t = state.season.transitionProgress;
   const toWinter = state.season.logicSeason === 'SUMMER';
   const snowiness = toWinter ? t : 1 - t;
@@ -431,11 +433,15 @@ export class PixelRenderer {
   resize(width: number, height: number): void {
     this.canvas.width = width;
     this.canvas.height = height;
+    // Resizing a canvas resets its 2D context state.
+    this.ctx.imageSmoothingEnabled = false;
   }
 
   draw(input: RenderSceneInput): void {
-    const { state, activePlayerId, hoveredTile } = input;
-    const viewport = getViewportInfo(state, activePlayerId);
+    const { state, activePlayerId, hoveredTile, viewAspect } = input;
+    const viewport = getViewportInfo(state, activePlayerId, viewAspect);
+    const lastTileX = Math.ceil(viewport.viewportTilesX);
+    const lastTileY = Math.ceil(viewport.viewportTilesY);
     const selected = state.selectedTileByPlayer[activePlayerId];
     const frameIndex = transitionFrameIndex(state);
     const cameraTileX = Math.floor(viewport.cameraX);
@@ -447,17 +453,17 @@ export class PixelRenderer {
 
     const backgroundTile = this.tileArt.frameFor('GRASS', frameIndex);
     if (backgroundTile) {
-      for (let y = -1; y <= viewport.viewportTiles; y += 1) {
+      for (let y = -1; y <= lastTileY; y += 1) {
         const py = y * TILE_SIZE - cameraOffsetY;
-        for (let x = -1; x <= viewport.viewportTiles; x += 1) {
+        for (let x = -1; x <= lastTileX; x += 1) {
           const px = x * TILE_SIZE - cameraOffsetX;
           this.ctx.drawImage(backgroundTile, px, py, TILE_SIZE, TILE_SIZE);
         }
       }
     }
 
-    for (let y = -1; y <= viewport.viewportTiles; y += 1) {
-      for (let x = -1; x <= viewport.viewportTiles; x += 1) {
+    for (let y = -1; y <= lastTileY; y += 1) {
+      for (let x = -1; x <= lastTileX; x += 1) {
         const worldX = cameraTileX + x;
         const worldY = cameraTileY + y;
         if (worldX < 0 || worldY < 0 || worldX >= state.width || worldY >= state.height) {

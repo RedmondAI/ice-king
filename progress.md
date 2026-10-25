@@ -2,6 +2,15 @@ Original prompt: I want you to create a web-based game called "Ice King". I want
 
 # Progress Log
 
+## 2026-10-25 (Full-window map)
+- Removed the blue letterbox bands beside the map: the game stage now fills the window at every breakpoint, with the side rail and chat rail overlaid.
+- Viewport is now aspect-aware: `5` tiles span the short side and the long side shows proportionally more; the view zooms in if it would exceed the playable `10x10` area and is clamped so `VOID` border tiles stay off-screen.
+- Camera drag, keyboard pan, minimap click/rect, hit-testing, and `render_game_to_text` (`camera.visibleTilesX/Y`) all use the shared viewport helpers in `apps/client/src/game/view.ts`.
+- Validation:
+  - `npm run test` -> pass
+  - `npm run build` -> pass
+  - Browser play test at 1440x860, 1600x800 (live resize), and 375x812: map fills the window, clicks select the expected tile, panning stays inside playable bounds, no console errors.
+
 ## 2026-02-27 (Milestone Update 41)
 - Implemented `Team` multiplayer mode in create-game flow and room runtime:
   - added 4-player team setup in `Team` mode (`P1/P2` blue, `P3/P4` red);

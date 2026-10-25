@@ -367,19 +367,19 @@ input {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding-right: clamp(250px, 38vw, 340px);
 }
 
+/* Stage fills the screen; the renderer widens the visible tile span to match. */
 .game-stage {
   position: relative;
-  width: min(1280px, 100vmin);
-  height: min(1280px, 100vmin);
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 
 .game-side-rail {
   position: absolute;
-  left: calc(100% + 14px);
+  right: 14px;
   top: 14px;
   width: clamp(236px, 38vw, 320px);
   display: flex;
@@ -391,10 +391,10 @@ input {
 
 .game-chat-rail {
   position: absolute;
-  left: calc((clamp(236px, 34vw, 320px) + 14px) * -1);
-  top: 0;
+  left: 14px;
+  top: 14px;
   width: clamp(236px, 34vw, 320px);
-  height: 100%;
+  height: calc(100% - 28px);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1165,15 +1165,6 @@ input {
 
 /* ── Tablet (≤1080px): side rail overlays on canvas ── */
 @media (max-width: 1080px) {
-  .game-shell {
-    padding-right: 0;
-  }
-
-  .game-stage {
-    width: min(1280px, 100vmin);
-    height: min(1280px, 100vmin);
-  }
-
   .splash-card {
     width: min(95vw, 700px);
     max-height: 94vh;
@@ -1309,13 +1300,6 @@ input {
     justify-content: center;
   }
 
-  .game-stage {
-    width: 100vw;
-    height: 100vw;
-    max-height: 100vh;
-    max-height: 100dvh;
-  }
-
   .game-logo-badge {
     width: min(130px, 32vw);
     left: 8px;
@@ -1406,15 +1390,8 @@ input {
   }
 }
 
-/* ── Landscape phones: prioritize width for square canvas ── */
+/* ── Landscape phones ── */
 @media (max-height: 500px) and (orientation: landscape) {
-  .game-stage {
-    width: min(1280px, 100vh);
-    width: min(1280px, 100dvh);
-    height: min(1280px, 100vh);
-    height: min(1280px, 100dvh);
-  }
-
   .game-side-rail {
     right: 6px;
     top: 6px;

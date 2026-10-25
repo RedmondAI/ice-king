@@ -1,15 +1,7 @@
 import { themePalette } from '@ice-king/theme-default';
 import type { GameState } from '@ice-king/shared';
 import type { CameraChangeHandler, IMinimapController } from '../types';
-
-interface PlayableBounds {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-  width: number;
-  height: number;
-}
+import { clampViewOrigin, getViewportInfo, playableBounds, visibleTileSpan } from '../view';
 
 function tileColor(state: GameState, x: number, y: number): string {
   const tile = state.tiles[y * state.width + x];
@@ -86,53 +78,6 @@ function drawOwnershipCheckmark(
   ctx.lineJoin = 'miter';
 }
 
-function playableBounds(state: GameState): PlayableBounds {
-  let minX = state.width - 1;
-  let minY = state.height - 1;
-  let maxX = 0;
-  let maxY = 0;
-  let foundPlayable = false;
-
-  for (const tile of state.tiles) {
-    if (tile.type === 'VOID') {
-      continue;
-    }
-    foundPlayable = true;
-    if (tile.x < minX) {
-      minX = tile.x;
-    }
-    if (tile.y < minY) {
-      minY = tile.y;
-    }
-    if (tile.x > maxX) {
-      maxX = tile.x;
-    }
-    if (tile.y > maxY) {
-      maxY = tile.y;
-    }
-  }
-
-  if (!foundPlayable) {
-    return {
-      minX: 0,
-      minY: 0,
-      maxX: state.width - 1,
-      maxY: state.height - 1,
-      width: state.width,
-      height: state.height,
-    };
-  }
-
-  return {
-    minX,
-    minY,
-    maxX,
-    maxY,
-    width: maxX - minX + 1,
-    height: maxY - minY + 1,
-  };
-}
-
 export class MinimapController implements IMinimapController {
   readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -140,6 +85,7 @@ export class MinimapController implements IMinimapController {
   private dragging = false;
   private latestState: GameState | null = null;
   private latestPlayerId = '';
+  private latestViewAspect = 1;
 
   constructor(canvas: HTMLCanvasElement, onCameraChange: CameraChangeHandler) {
     this.canvas = canvas;
@@ -197,22 +143,17 @@ export class MinimapController implements IMinimapController {
     const tileX = bounds.minX + Math.floor(normalizedX * bounds.width);
     const tileY = bounds.minY + Math.floor(normalizedY * bounds.height);
     const camera = state.cameraByPlayer[this.latestPlayerId];
+    const { tilesX, tilesY } = visibleTileSpan(state, camera.viewportTiles, this.latestViewAspect);
 
-    const nextX = Math.max(
-      0,
-      Math.min(state.width - camera.viewportTiles, tileX - Math.floor(camera.viewportTiles / 2)),
-    );
-    const nextY = Math.max(
-      0,
-      Math.min(state.height - camera.viewportTiles, tileY - Math.floor(camera.viewportTiles / 2)),
-    );
+    const next = clampViewOrigin(state, tileX + 0.5 - tilesX / 2, tileY + 0.5 - tilesY / 2, tilesX, tilesY);
 
-    this.onCameraChange(nextX, nextY);
+    this.onCameraChange(Math.max(0, next.x), Math.max(0, next.y));
   }
 
-  draw(state: GameState, activePlayerId: string): void {
+  draw(state: GameState, activePlayerId: string, viewAspect = 1): void {
     this.latestState = state;
     this.latestPlayerId = activePlayerId;
+    this.latestViewAspect = viewAspect;
 
     const width = this.canvas.width;
     const height = this.canvas.height;
@@ -245,14 +186,14 @@ export class MinimapController implements IMinimapController {
       }
     }
 
-    const camera = state.cameraByPlayer[activePlayerId];
+    const viewport = getViewportInfo(state, activePlayerId, viewAspect);
     this.ctx.strokeStyle = '#ff4242';
     this.ctx.lineWidth = 2;
     this.ctx.strokeRect(
-      Math.floor((camera.x - bounds.minX) * sx),
-      Math.floor((camera.y - bounds.minY) * sy),
-      Math.ceil(camera.viewportTiles * sx),
-      Math.ceil(camera.viewportTiles * sy),
+      Math.floor((viewport.cameraX - bounds.minX) * sx),
+      Math.floor((viewport.cameraY - bounds.minY) * sy),
+      Math.ceil(viewport.viewportTilesX * sx),
+      Math.ceil(viewport.viewportTilesY * sy),
     );
 
     this.ctx.strokeStyle = themePalette.uiBorder;

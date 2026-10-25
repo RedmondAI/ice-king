@@ -106,13 +106,13 @@ Last updated: 2026-02-27
 ## World, Camera, and Rendering
 - Playable world size: `10 x 10` tiles.
 - Runtime grid size: `12 x 12` (`1` non-interactable `VOID` border tile around all sides).
-- Main viewport: `5 x 5` tiles.
+- Main viewport: `5` tiles across the short side of the screen; the long side shows proportionally more (zooming in slightly if that would exceed the playable area).
 - Draw size: `256 x 256` px per tile.
-- Main canvas render size in default play view: `1280 x 1280`.
+- Main canvas render size: `256` px per visible tile on each axis (e.g. `1280` px tall on a landscape screen).
 - Display sizing:
-- Game view is a centered square stage that scales uniformly to fit the browser window (max `1280 x 1280`, letterboxing allowed).
+- Game view fills the whole browser window (no letterboxing); the camera stays inside the playable area so `VOID` border tiles are never shown.
 - Minimap:
-- Right-side rail (outside game area), bottom segment.
+- Right-side rail (overlaid on the game area), top segment.
 - Playable-area preview (non-interactable `VOID` border tiles are hidden).
 - Red camera rectangle.
 - Click/drag to move camera.
