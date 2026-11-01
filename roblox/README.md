@@ -104,6 +104,14 @@ On [create.roblox.com → Open Cloud → API Keys](https://create.roblox.com/das
 edit the key and add the **universe-places** API (Write) for this experience. For
 `--restart`, also add the **universe** API (Write).
 
+### Icon and thumbnail
+
+`art/store/icon.png` (512×512) and `art/store/thumbnail.png` (1920×1080) are built from
+the splash and logo by `python3 scripts/build-store-art.py`. Upload them by hand in
+Studio (**File → Game Settings → Basic Info**) or on the Creator Dashboard. Open Cloud
+API keys can only set icons and thumbnails for translations, not for the game's own
+language, so this can't be scripted.
+
 Friends who want to play each other should join the same server (the **Join** button on
 a friend's profile), then both click **Play vs Player**.
 
