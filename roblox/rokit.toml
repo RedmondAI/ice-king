@@ -1,0 +1,8 @@
+# Toolchain for the Ice King Roblox project, managed by Rokit (https://github.com/rojo-rbx/rokit).
+# Install Rokit, then run `rokit install` in this folder to fetch these exact versions.
+
+[tools]
+rojo = "rojo-rbx/rojo@7.7.1"
+lune = "lune-org/lune@0.11.0"
+stylua = "JohnnyMorganz/StyLua@2.6.0"
+selene = "Kampfkarren/selene@0.32.0"

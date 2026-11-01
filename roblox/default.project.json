@@ -1,0 +1,24 @@
+{
+  "name": "ice-king",
+  "globIgnorePaths": ["**/*.spec.luau", "**/package.json", "**/tsconfig.json"],
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "IceKing": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "IceKingServer": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "IceKingClient": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}

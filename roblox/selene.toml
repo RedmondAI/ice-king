@@ -1,0 +1,9 @@
+# Lint config. Uses the Roblox standard library.
+# One-time setup (needs the Roblox API dump): `selene generate-roblox-std`
+# Linting is optional; the game and tests run without it.
+std = "roblox"
+
+[rules]
+# The pure-core modules are written to run under both Roblox and the Lune
+# test harness, so a few patterns are intentional.
+global_usage = "allow"

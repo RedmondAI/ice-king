@@ -1,0 +1,10 @@
+{
+  "tiles/factory-transition-winter-to-summer-grid.png": { "assetId": "92063725929912", "hash": "c67af26006eee5284de1c49ca52a838ac00133a07e8f80b94a2640f88229e4e4" },
+  "tiles/forest-transition-winter-to-summer-grid.png": { "assetId": "120120159718998", "hash": "ea64f3b1b94ad91e64df3f9a5aad85a59aa2676f52a89d10d1c39e65965c3fbd" },
+  "tiles/grass-transition-winter-to-summer-grid.png": { "assetId": "91038405858540", "hash": "6d48190219744b62effe51e471d3b935810e2548edc4a330e9746a52d9509393" },
+  "tiles/house-transition-winter-to-summer-grid.png": { "assetId": "110540256431523", "hash": "055d6ddaf919a59b4fce2eb0841a9fb48be6a328563550185c1247ad0458a6ab" },
+  "tiles/pond-transition-winter-to-summer-grid.png": { "assetId": "124590062330038", "hash": "6d9c5c5a1db8729be793a92be55b373dcf90289abb84dd0ae5b3df9d447fd054" },
+  "tiles/train-transition-winter-to-summer-grid.png": { "assetId": "96029158938368", "hash": "abeca2748db5a60902043f7e77d4aeab08c710bc8041869bae7aec8df495250e" },
+  "ui/ice-king-logo.png": { "assetId": "107990399551398", "hash": "27001e02f8cf808adc4296ec0e05ca9613a2bee3f48e352ad7412d35f43bfea9" },
+  "ui/splash-ice-king.png": { "assetId": "93886878927362", "hash": "6710804c9073d54d9e44115569de2522c7280c8f4ff03df197459859c5b0e692" }
+}

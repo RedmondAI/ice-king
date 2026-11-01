@@ -1,0 +1,14 @@
+# Roblox / Rojo build artifacts
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxm
+*.rbxmx
+/build/
+
+# Tooling caches
+/.lune/
+/.darklua-cache/
+
+# OS
+.DS_Store
